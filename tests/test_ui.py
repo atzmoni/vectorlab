@@ -14,7 +14,9 @@ def test_static_ui_has_required_workspace_controls():
         "vectorizeButton", "svgButton", "dxfButton", "queueList",
     ]:
         assert f'id="{element_id}"' in html
-    assert 'accept="image/png,image/jpeg,image/webp"' in html
+    assert 'accept="image/png,image/jpeg,image/webp' in html
+    assert "image/svg+xml" in html
+    assert "application/pdf" in html
     assert "multiple" in html
     assert "FormData" in html
     assert "URL.createObjectURL" in html

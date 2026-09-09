@@ -182,7 +182,7 @@
       </aside>
       <section class="stage">
         <div class="stage-toolbar"><div class="crumb"><b>New vectorization</b><span class="slash">/</span><span id="fileCrumb">No file selected</span></div><div class="view-tools"><button class="tool-btn active" id="splitView" title="Split view">▦</button><button class="tool-btn" id="compareView" title="Compare slider">◐</button><span class="zoom-value" id="zoomValue">Fit</span><button class="tool-btn" id="zoomOut" title="Zoom out">−</button><button class="tool-btn" id="zoomIn" title="Zoom in">+</button></div></div>
-        <div class="dropzone" id="dropzone"><div class="drop-inner"><div class="upload-icon">↥</div><h2>Drop raster images here</h2><p>Convert PNG, JPG, or WEBP into clean, cut-ready vectors.</p><button class="primary" id="chooseButton">Choose files</button><input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp" multiple /><small>Up to 20 MB per image · multiple files supported</small></div></div>
+        <div class="dropzone" id="dropzone"><div class="drop-inner"><div class="upload-icon">↥</div><h2>Drop images or vectors here</h2><p>Convert PNG, JPG, WEBP, SVG, or PDF into precise, cut-ready vectors — raster traces via VTracer, vectors preserve every Bezier.</p><button class="primary" id="chooseButton">Choose files</button><input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,application/pdf" multiple /><small>Up to 20 MB per file · raster, SVG and PDF supported · multiple files</small></div></div>
         <div class="preview-wrap" id="previewWrap">
           <div class="preview-grid" id="previewGrid">
             <div class="preview-card"><div class="preview-head"><span>Original raster</span><span class="badge" id="sourceType">SOURCE</span></div><div class="canvas" id="rasterCanvas"></div></div>
@@ -216,8 +216,10 @@
     ['dragleave', 'drop'].forEach((eventName) => dropzone.addEventListener(eventName, (event) => { event.preventDefault(); dropzone.classList.remove('drag'); }));
     dropzone.addEventListener('drop', (event) => acceptFiles([...event.dataTransfer.files]));
     function acceptFiles(files) {
-      const accepted = files.filter((file) => ['image/png', 'image/jpeg', 'image/webp'].includes(file.type));
-      if (!accepted.length) return toast('Please choose a PNG, JPG, or WEBP image.', true);
+      const byExt = (name) => (name.split('.').pop() || '').toLowerCase();
+      const isVectorName = (name) => ['svg','pdf'].includes(byExt(name));
+      const accepted = files.filter((file) => ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml', 'application/pdf'].includes(file.type) || isVectorName(file.name));
+      if (!accepted.length) return toast('Please choose a PNG, JPG, WEBP, SVG, or PDF file.', true);
       accepted.forEach((file) => { if (!state.objectUrls.has(file)) state.objectUrls.set(file, URL.createObjectURL(file)); }); state.files = [...state.files, ...accepted]; state.activeIndex = state.files.length - accepted.length; state.result = null;
       renderSource(); renderQueue(); toast(`${accepted.length} image${accepted.length > 1 ? 's' : ''} added to the queue.`);
     }
@@ -225,8 +227,17 @@
       if (!state.files.length) return;
       dropzone.classList.add('hidden'); emptyState.style.display = 'none'; previewWrap.classList.add('visible');
       const file = state.files[state.activeIndex]; state.objectUrl = state.objectUrls.get(file) || URL.createObjectURL(file); state.objectUrls.set(file, state.objectUrl); state.result = state.results.get(file) || null;
-      $('fileCrumb').textContent = file.name; $('sourceType').textContent = file.type.split('/')[1].toUpperCase(); $('vectorStatus').textContent = 'READY';
-      $('rasterCanvas').innerHTML = `<img src="${state.objectUrl}" alt="${escapeHtml(file.name)}" id="rasterPreview" />`;
+      $('fileCrumb').textContent = file.name; $('vectorStatus').textContent = 'READY';
+      const isVectorFile = (f) => (f.type === 'image/svg+xml' || f.type === 'application/pdf' || /\.(svg|pdf)$/i.test(f.name));
+      $('sourceType').textContent = isVectorFile(file) ? 'VECTOR SOURCE' : file.type.split('/')[1].toUpperCase();
+      if (isVectorFile(file) && file.name.toLowerCase().endsWith('.svg')) {
+        // For SVG source render directly without extra fetch
+        $('rasterCanvas').innerHTML = `<img src="${state.objectUrl}" alt="${escapeHtml(file.name)}" id="rasterPreview" />`;
+      } else if (isVectorFile(file)) {
+        $('rasterCanvas').innerHTML = `<div class="empty-vector"><strong>${escapeHtml(file.name)}</strong>PDF vector source — will extract every curve precisely.</div>`;
+      } else {
+        $('rasterCanvas').innerHTML = `<img src="${state.objectUrl}" alt="${escapeHtml(file.name)}" id="rasterPreview" />`;
+      }
       $('vectorCanvas').innerHTML = state.result?.svgUrl ? `<img src="${state.result.svgUrl}" alt="Generated optimized SVG" id="svgPreview" />` : '<div class="empty-vector"><strong>Ready to vectorize</strong>Adjust settings, then run the local engine.</div>';
       if (state.result) { $('vectorStatus').textContent = 'COMPLETE'; $('svgButton').disabled = false; $('dxfButton').disabled = false; $('statsText').textContent = `${state.result.payload.statistics.nodes.toLocaleString()} nodes · ${state.result.payload.statistics.contours} closed contours · ${state.result.payload.processing.duration_ms} ms`; bindResultDownloads(state.result.payload, file); } else { $('vectorStatus').textContent = 'READY'; $('svgButton').disabled = true; $('dxfButton').disabled = true; $('statsText').textContent = `${formatBytes(file.size)} · ${file.type.split('/')[1].toUpperCase()} source`; }
       $('compare').style.display = 'none'; $('previewGrid').style.display = 'grid';

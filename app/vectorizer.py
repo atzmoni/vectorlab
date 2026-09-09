@@ -16,11 +16,12 @@ from PIL import Image
 from .dxf import svg_to_dxf
 
 MAX_IMAGE_PIXELS = int(os.getenv("MAX_IMAGE_PIXELS", "50000000"))
+MAX_VECTOR_BYTES = int(os.getenv("MAX_VECTOR_BYTES", "8000000"))
 
 try:
     import vtracer
-except ImportError:  # pragma: no cover - exercised only when optional wheel is unavailable
-    vtracer = None
+except ImportError:  # pragma: no cover
+    vtracer = None  # type: ignore
 
 
 @dataclass
@@ -64,11 +65,9 @@ def _load_image(data: bytes) -> tuple[np.ndarray, int, int]:
 
 
 def _preprocess(rgb: np.ndarray, settings: VectorizeSettings) -> tuple[np.ndarray, np.ndarray, dict[str, int]]:
-    """PixelToPath-inspired local cleanup: edge-preserving denoise, contrast, speckle removal, and gap closing."""
     gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
     if settings.noise_filter > 0:
         diameter = max(3, settings.noise_filter * 2 + 1)
-        # Bilateral filtering removes isolated pixel noise without smearing drawing edges.
         denoised = cv2.bilateralFilter(gray, diameter, 32 + settings.noise_filter * 8, 32 + settings.noise_filter * 8)
     else:
         denoised = gray
@@ -80,7 +79,6 @@ def _preprocess(rgb: np.ndarray, settings: VectorizeSettings) -> tuple[np.ndarra
     kernel_size = 1 if settings.noise_filter == 0 else 2
     opened = cv2.morphologyEx(binary, cv2.MORPH_OPEN, np.ones((kernel_size, kernel_size), np.uint8))
     closed = cv2.morphologyEx(opened, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
-    # Remove connected components smaller than the requested speckle area.
     min_component_area = 1 if settings.noise_filter == 0 else max(4, settings.noise_filter * settings.noise_filter * 2)
     count, labels, stats, _ = cv2.connectedComponentsWithStats(closed, connectivity=8)
     cleaned = np.zeros_like(closed)
@@ -90,24 +88,17 @@ def _preprocess(rgb: np.ndarray, settings: VectorizeSettings) -> tuple[np.ndarra
             cleaned[labels == label] = 255
         else:
             removed_components += 1
-    # Preserve the source geometry but expose a stable mask for fallback contour tracing.
     return enhanced, cleaned, {"removed_components": removed_components, "min_component_area": min_component_area}
 
 
 def _preprocessed_png(rgb: np.ndarray, settings: VectorizeSettings) -> tuple[bytes, dict[str, int]]:
-    """Prepare a clean raster for VTracer while preserving chroma in color mode."""
     enhanced, cleaned, cleanup = _preprocess(rgb, settings)
     if settings.mode == "monochrome":
-        # VTracer's binary frontend expects dark foreground pixels. Feeding the
-        # cleaned mask itself ensures thresholding and speckle removal are real
-        # preprocessing stages even with legacy VTracer bindings.
         prepared = cv2.cvtColor(cv2.bitwise_not(cleaned), cv2.COLOR_GRAY2RGB)
     else:
         lab = cv2.cvtColor(rgb, cv2.COLOR_RGB2LAB)
         lab[:, :, 0] = enhanced
         prepared = cv2.cvtColor(lab, cv2.COLOR_LAB2RGB)
-        # Keep the full color field intact; VTracer's color clustering and
-        # filter_speckle handle region cleanup without erasing light artwork.
         if settings.invert:
             prepared = cv2.bitwise_not(prepared)
     ok, encoded = cv2.imencode(".png", cv2.cvtColor(prepared, cv2.COLOR_RGB2BGR))
@@ -188,9 +179,9 @@ def _fallback_svg(width: int, height: int, paths: list[tuple[str, str, float, in
 
 
 def _vtracer_svg(data: bytes, source_format: str, settings: VectorizeSettings) -> str:
-    if vtracer is None:
+    if vtracer is None:  # type: ignore
         raise RuntimeError("VTracer is not installed")
-    if hasattr(vtracer, "Config") and hasattr(vtracer.Config, "convert_bytes"):
+    if hasattr(vtracer, "Config") and hasattr(vtracer.Config, "convert_bytes"):  # type: ignore
         kwargs: dict[str, Any] = {
             "clustering": "bw" if settings.mode == "monochrome" else "color-cluster",
             "hierarchical": "stacked" if settings.mode == "monochrome" else "cutout",
@@ -203,7 +194,7 @@ def _vtracer_svg(data: bytes, source_format: str, settings: VectorizeSettings) -
             kwargs["binary_threshold"] = settings.threshold
         if settings.simplify:
             kwargs["simplify"] = settings.tolerance
-        return vtracer.Config(**kwargs).convert_bytes(data, format=source_format)
+        return vtracer.Config(**kwargs).convert_bytes(data, format=source_format)  # type: ignore
     if hasattr(vtracer, "convert_raw_image_to_svg"):
         kwargs = {
             "colormode": "binary" if settings.mode == "monochrome" else "color",
@@ -217,14 +208,12 @@ def _vtracer_svg(data: bytes, source_format: str, settings: VectorizeSettings) -
         if settings.simplify:
             kwargs["simplify"] = settings.tolerance
         try:
-            return vtracer.convert_raw_image_to_svg(data, img_format=source_format, **kwargs)
+            return vtracer.convert_raw_image_to_svg(data, img_format=source_format, **kwargs)  # type: ignore
         except TypeError:
-            # 0.6.x does not expose simplify/path_precision; do not pass
-            # unsupported keywords into the legacy native extension.
             legacy = {key: value for key, value in kwargs.items() if key in {"colormode", "hierarchical", "mode", "filter_speckle", "color_precision", "layer_difference", "corner_threshold", "length_threshold", "max_iterations", "splice_threshold"}}
-            return vtracer.convert_raw_image_to_svg(data, img_format=source_format, **legacy)
+            return vtracer.convert_raw_image_to_svg(data, img_format=source_format, **legacy)  # type: ignore
     if hasattr(vtracer, "convert_bytes"):
-        return vtracer.convert_bytes(data)
+        return vtracer.convert_bytes(data)  # type: ignore
     raise RuntimeError("Unsupported VTracer Python binding")
 
 
@@ -242,6 +231,123 @@ def _normalize_vtracer_svg(svg: str, width: int, height: int, settings: Vectoriz
     return svg[:root_match.start()] + root + svg[root_match.end():]
 
 
+def _sanitize_vector_svg(svg_text: str) -> str:
+    """Strip scripts, event handlers, and cap size for safe handling."""
+    if len(svg_text) > MAX_VECTOR_BYTES:
+        raise ValueError(f"SVG exceeds {MAX_VECTOR_BYTES:,}-byte limit")
+    # Remove <script> blocks
+    svg_text = re.sub(r"<script[^>]*>.*?</script\s*>", "", svg_text, flags=re.DOTALL | re.IGNORECASE)
+    # Remove event handler attributes (onload, onclick, etc.)
+    svg_text = re.sub(r"\s+on\w+\s*=\s*(?:\"[^\"]*\"|'[^']*'|[^\s>]+)", "", svg_text, flags=re.IGNORECASE)
+    # Block external references that could leak
+    if re.search(r"xlink:href\s*=\s*['\"][^'\"]*https?://", svg_text, flags=re.IGNORECASE):
+        svg_text = re.sub(r"xlink:href\s*=\s*['\"][^'\"]*https?://[^'\"]*['\"]", "", svg_text, flags=re.IGNORECASE)
+    # Validate well-formed
+    try:
+        ET.fromstring(svg_text)
+    except ET.ParseError as exc:
+        raise ValueError("Invalid SVG document") from exc
+    return svg_text
+
+
+def _normalize_any_svg(svg_text: str, settings: VectorizeSettings) -> tuple[str, int, int]:
+    """Normalize any input SVG (not just VTracer) to consistent mm/in units."""
+    svg_text = _sanitize_vector_svg(svg_text)
+    try:
+        root = ET.fromstring(svg_text)
+    except ET.ParseError as exc:
+        raise ValueError("Invalid SVG document") from exc
+    # Determine viewBox or width/height for bounds
+    viewbox = root.attrib.get("viewBox", "").strip()
+    vb_w = vb_h = None
+    if viewbox:
+        parts = viewbox.replace(",", " ").split()
+        if len(parts) == 4:
+            try:
+                vb_w = float(parts[2])
+                vb_h = float(parts[3])
+            except ValueError:
+                vb_w = vb_h = None
+    # Fallback width/height
+    def numeric(v: str) -> float | None:
+        m = re.search(r"[-+]?(?:\d+\.?\d*|\.\d+)", v)
+        return float(m.group(0)) if m else None
+    if vb_w is None:
+        vb_w = numeric(root.attrib.get("width", "")) or 100
+    if vb_h is None:
+        vb_h = numeric(root.attrib.get("height", "")) or 100
+    # Physical scaling
+    physical_scale = 25.4 / 96 if settings.units == "mm" else 1 / 96
+    # Assume viewBox units are at 96 dpi if no explicit dpi; keep viewBox as-is, only adjust width/height attrs
+    phys_w = vb_w * physical_scale
+    phys_h = vb_h * physical_scale
+    # Rewrite root attrs preserving viewBox
+    root_match = re.search(r"<svg\b[^>]*>", svg_text, flags=re.IGNORECASE)
+    if root_match:
+        root_tag = root_match.group(0)
+        if not re.search(r"\bviewBox\s*=", root_tag, flags=re.IGNORECASE):
+            root_tag = root_tag[:-1] + f' viewBox="0 0 {vb_w:.3f} {vb_h:.3f}">'
+        # Remove existing width/height and set new
+        root_tag = re.sub(r"\s+(?:width|height)\s*=\s*(['\"]).*?\1", "", root_tag, flags=re.IGNORECASE)
+        root_tag = root_tag[:-1] + f' width="{phys_w:.3f}{settings.units}" height="{phys_h:.3f}{settings.units}">'
+        svg_text = svg_text[:root_match.start()] + root_tag + svg_text[root_match.end():]
+        try:
+            ET.fromstring(svg_text)
+        except ET.ParseError:
+            pass
+    # Stats
+    nodes, contours, closed = _svg_stats(svg_text)
+    return svg_text, int(vb_w), int(vb_h)
+
+
+def _pdf_to_svg(data: bytes, settings: VectorizeSettings) -> tuple[str, int, int]:
+    """Extract precise vector outlines from PDF via PyMuPDF (no rasterization)."""
+    if len(data) > MAX_VECTOR_BYTES:
+        raise ValueError(f"PDF exceeds {MAX_VECTOR_BYTES:,}-byte limit")
+    if data[:5] != b"%PDF-":
+        raise ValueError("Invalid PDF file")
+    try:
+        import fitz  # pymupdf
+    except ImportError as exc:
+        raise RuntimeError("pymupdf is required for PDF vector extraction") from exc
+    doc = fitz.open(stream=data, filetype="pdf")
+    if len(doc) == 0:
+        raise ValueError("Empty PDF")
+    # Combine all pages? For now take first page; multi-page PDFs: combine with page offsets
+    # Use get_svg_image for highest fidelity (preserves Beziers)
+    svgs: list[str] = []
+    max_w = 0
+    max_h = 0
+    for page in doc:
+        svg = page.get_svg_image(matrix=fitz.Matrix(1, 1))
+        # Strip outer <svg> wrapper, keep inner paths; instead we can concatenate pages with translated offsets
+        # For simplicity, take first page's viewBox and if multipage, stack vertically
+        # Remove xml header from svg
+        # Extract inner content and dimensions
+        m = re.search(r'<svg[^>]*viewBox="([^"]+)"[^>]*>(.*)</svg\s*>', svg, flags=re.DOTALL | re.IGNORECASE)
+        if m:
+            vb = m.group(1).strip().replace(",", " ").split()
+            try:
+                pw = float(vb[2])
+                ph = float(vb[3])
+            except ValueError:
+                pw = page.rect.width
+                ph = page.rect.height
+            max_w = max(max_w, pw)
+            max_h += ph
+            svgs.append(m.group(2))
+        else:
+            # fallback: use whole svg
+            svgs.append(svg)
+    if not svgs:
+        raise ValueError("PDF contains no vector content")
+    # Build combined SVG with proper viewBox
+    combined_inner = "\n".join(svgs)
+    combined = f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {max_w:.3f} {max_h:.3f}">{combined_inner}</svg>'
+    normalized, w, h = _normalize_any_svg(combined, settings)
+    return normalized, w, h
+
+
 def _svg_stats(svg: str) -> tuple[int, int, int]:
     try:
         root = ET.fromstring(svg)
@@ -253,17 +359,72 @@ def _svg_stats(svg: str) -> tuple[int, int, int]:
     return nodes, len(path_data), closed
 
 
-
 def _dxf_document(svg: str, units: str) -> tuple[bytes, int]:
-    # Centralized XML/path handling avoids corrupting SVG numbers with regex scaling.
     return svg_to_dxf(svg, units=units, curve_tolerance_px=1.0)
 
 
 def vectorize(data: bytes, settings_dict: dict[str, Any] | None = None, source_format: str = "png") -> dict[str, Any]:
     settings = _normalize_settings(settings_dict)
+    src = source_format.lower().replace("jpg", "jpeg").lstrip(".")
+    # Vector path: SVG or PDF — preserve Beziers losslessly, no raster trace
+    if src in {"svg"}:
+        if len(data) > MAX_VECTOR_BYTES:
+            raise ValueError(f"File exceeds {MAX_VECTOR_BYTES:,}-byte limit")
+        svg_text_raw = data.decode("utf-8", errors="strict")
+        svg_text, width, height = _normalize_any_svg(svg_text_raw, settings)
+        nodes, contours, closed = _svg_stats(svg_text)
+        dxf, dxf_polylines = _dxf_document(svg_text, settings.units)
+        contours = dxf_polylines
+        closed = dxf_polylines
+        return {
+            "svg": svg_text.encode("utf-8"),
+            "dxf": dxf,
+            "width": width,
+            "height": height,
+            "node_count": nodes,
+            "contour_count": contours,
+            "closed_paths": closed,
+            "dxf_polylines": dxf_polylines,
+            "processing": {
+                "engine": "svg-passthrough",
+                "engine_reference": "lossless SVG Bezier preservation",
+                "preprocessing": ["SVG sanitization", "viewBox normalization"],
+                "removed_components": 0,
+                "optimized": settings.simplify,
+                "units": settings.units,
+                "mode": settings.mode,
+                "cut_ready": True,
+            },
+        }
+    if src in {"pdf"}:
+        svg_text, width, height = _pdf_to_svg(data, settings)
+        nodes, contours, closed = _svg_stats(svg_text)
+        dxf, dxf_polylines = _dxf_document(svg_text, settings.units)
+        contours = dxf_polylines
+        closed = dxf_polylines
+        return {
+            "svg": svg_text.encode("utf-8"),
+            "dxf": dxf,
+            "width": width,
+            "height": height,
+            "node_count": nodes,
+            "contour_count": contours,
+            "closed_paths": closed,
+            "dxf_polylines": dxf_polylines,
+            "processing": {
+                "engine": "pdf-vector-extract",
+                "engine_reference": "pymupdf vector extraction + spline DXF",
+                "preprocessing": ["PDF vector outline extraction", "Bezier preservation"],
+                "removed_components": 0,
+                "optimized": settings.simplify,
+                "units": settings.units,
+                "mode": settings.mode,
+                "cut_ready": True,
+            },
+        }
+    # Raster path
     rgb, width, height = _load_image(data)
-    source_format = source_format.lower().replace("jpg", "jpeg")
-    if source_format not in {"png", "jpeg", "webp"}:
+    if src not in {"png", "jpeg", "webp"}:
         raise ValueError("Unsupported raster format")
     engine = "vtracer-spline"
     cleanup = {"removed_components": 0, "min_component_area": 0}
@@ -278,8 +439,6 @@ def vectorize(data: bytes, settings_dict: dict[str, Any] | None = None, source_f
         svg_text, nodes, contours = _fallback_svg(width, height, paths, settings)
         closed = contours
     dxf, dxf_polylines = _dxf_document(svg_text, settings.units)
-    # Count actual closed CAM contours, including holes or multiple subpaths
-    # emitted inside a single SVG <path> element.
     contours = dxf_polylines
     closed = dxf_polylines
     return {

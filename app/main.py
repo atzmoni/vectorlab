@@ -12,7 +12,7 @@ from typing import Annotated
 
 try:
     from dotenv import load_dotenv
-except ImportError:  # pragma: no cover - dependency is present in normal installs
+except ImportError:  # pragma: no cover
     def load_dotenv() -> None:
         return None
 
@@ -51,14 +51,12 @@ def _verify_download(job_id: str, format_name: str, expires: int, signature: str
         raise HTTPException(status_code=410, detail="Download link expired")
     expected = _sign_download(job_id, format_name, expires).split("signature=", 1)[1]
     if expected != signature:
-        # constant-time compare without importing secrets in hot path mock; real compare below
         import secrets as _secrets
         if not _secrets.compare_digest(signature, expected):
             raise HTTPException(status_code=403, detail="Invalid download signature")
 
 
 def _safe_output_path(job_id: str, format_name: str) -> Path:
-    """Resolve a generated file and reject symlinks/path escapes from OUTPUT_DIR."""
     root = OUTPUT_DIR.resolve()
     candidates = list(root.glob(f"*-{job_id}.{format_name}"))
     for candidate in candidates:
@@ -87,9 +85,13 @@ async def vectorize_endpoint(
     image: Annotated[UploadFile, File(...)],
     settings: Annotated[str | None, Form()] = None,
 ) -> dict:
-    allowed = {"image/png", "image/jpeg", "image/webp"}
-    if image.content_type not in allowed:
-        raise HTTPException(status_code=415, detail="Only PNG, JPG, and WEBP images are supported")
+    vector_mimes = {"image/svg+xml", "application/pdf"}
+    raster_mimes = {"image/png", "image/jpeg", "image/webp"}
+    allowed = raster_mimes | vector_mimes
+    filename_lower = (image.filename or "").lower()
+    is_vector_by_ext = filename_lower.endswith(".svg") or filename_lower.endswith(".pdf")
+    if image.content_type not in allowed and not is_vector_by_ext:
+        raise HTTPException(status_code=415, detail="Only PNG, JPG, WEBP, SVG, and PDF are supported")
     max_bytes = MAX_UPLOAD_MB * 1024 * 1024
     content = await image.read(max_bytes + 1)
     await image.close()
@@ -106,14 +108,17 @@ async def vectorize_endpoint(
     started = time.perf_counter()
     try:
         extension = Path(image.filename or "source.png").suffix.lower().lstrip(".") or "png"
-        # CPU-heavy decoding/tracing runs in AnyIO's worker pool, not on the ASGI event loop.
+        if image.content_type == "image/svg+xml" and not extension:
+            extension = "svg"
+        if image.content_type == "application/pdf" and not extension:
+            extension = "pdf"
         result = await run_in_threadpool(vectorize, content, parsed_settings, extension)
         paths = await run_in_threadpool(save_outputs, result, str(OUTPUT_DIR), Path(image.filename or "vectorization").stem)
     except HTTPException:
         raise
     except Exception as exc:
         logger.exception("Vectorization failed")
-        raise HTTPException(status_code=422, detail="Vectorization failed for this image") from exc
+        raise HTTPException(status_code=422, detail="Vectorization failed for this file") from exc
     elapsed_ms = round((time.perf_counter() - started) * 1000)
     expires = int(time.time()) + DOWNLOAD_TTL_SECONDS
     return {
