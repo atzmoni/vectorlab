@@ -72,6 +72,19 @@ async def test_multipart_vectorize_downloads_and_signed_expiry(client, monkeypat
 
 
 @pytest.mark.anyio
+async def test_jobs_lists_history_and_color_palette(client):
+    r1 = await client.post("/api/v1/vectorize", files={"image": ("a.png", png_bytes(), "image/png")}, data={"settings": '{"mode":"monochrome"}'})
+    assert r1.status_code == 200
+    # color request with precision mapping — should surface palette
+    r2 = await client.post("/api/v1/vectorize", files={"image": ("b.png", png_bytes(), "image/png")}, data={"settings": '{"mode":"color","color_precision":6,"layer_difference":16}'})
+    assert r2.status_code == 200
+    assert "palette" in r2.json()
+    jobs = await client.get("/api/v1/jobs")
+    assert jobs.status_code == 200
+    assert len(jobs.json()["jobs"]) >= 2
+
+
+@pytest.mark.anyio
 async def test_svg_vector_passthrough_endpoint(client):
     response = await client.post(
         "/api/v1/vectorize",
