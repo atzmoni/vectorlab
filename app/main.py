@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
 
@@ -30,6 +32,7 @@ STATIC_DIR = BASE_DIR / "static"
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", str(BASE_DIR.parent / "output"))).resolve()
 MAX_UPLOAD_MB = max(1, int(os.getenv("MAX_UPLOAD_MB", "20")))
 DOWNLOAD_TTL_SECONDS = max(60, int(os.getenv("DOWNLOAD_TTL_SECONDS", "3600")))
+SWEEP_INTERVAL_SECONDS = max(30, int(os.getenv("SWEEP_INTERVAL_SECONDS", "300")))
 CORS_ORIGINS = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "http://127.0.0.1:8000,http://localhost:8000").split(",") if origin.strip()]
 
 # Re-export for tests that patch main.OUTPUT_DIR / main._sign_download etc.
@@ -41,7 +44,42 @@ DOWNLOAD_SIGNING_SECRET = os.getenv("DOWNLOAD_SIGNING_SECRET", "vectorlab-local-
 # Back-compat: tests import ``from app import vectorizer`` and patch ``main.vectorize`` for timing tests
 vectorize_fn = vectorize
 
-app = FastAPI(title="VectorLab Local Vectorization API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Background periodic sweep — ensures TTL cleanup even when idle (no requests).
+    stop = asyncio.Event()
+
+    async def sweeper() -> None:
+        while not stop.is_set():
+            try:
+                # wait interval, but wake early on shutdown
+                try:
+                    await asyncio.wait_for(stop.wait(), timeout=SWEEP_INTERVAL_SECONDS)
+                    break
+                except asyncio.TimeoutError:
+                    pass
+                # Sweep with current OUTPUT_DIR (may have been monkeypatched in tests — read global)
+                try:
+                    await run_in_threadpool(jobs.sweep_expired, None, OUTPUT_DIR)
+                except Exception:
+                    logger.exception("Background sweep failed")
+            except asyncio.CancelledError:
+                break
+
+    task = asyncio.create_task(sweeper())
+    try:
+        yield
+    finally:
+        stop.set()
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+
+app = FastAPI(title="VectorLab Local Vectorization API", version="1.0.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
@@ -64,8 +102,8 @@ async def health() -> dict[str, str]:
 
 @app.get("/api/v1/jobs")
 async def list_jobs() -> dict:
-    jobs.sweep_expired()
-    records = jobs.list_jobs()
+    await run_in_threadpool(jobs.sweep_expired, None, OUTPUT_DIR)
+    records = jobs.list_jobs(output_dir=OUTPUT_DIR)
     return {"jobs": [jobs.serialize_job(r, sign_download) for r in records]}
 
 
@@ -102,7 +140,7 @@ async def vectorize_endpoint(
         if image.content_type == "application/pdf" and not extension:
             extension = "pdf"
         # Purge stale outputs so DOWNLOAD_TTL is actually enforced (ephemeral lifecycle)
-        jobs.sweep_expired()
+        await run_in_threadpool(jobs.sweep_expired, None, OUTPUT_DIR)
         fn = vectorize_fn  # allow tests to monkeypatch ``main.vectorize``
         # Some tests patch ``main.vectorize`` with a stub that does not accept ``extension``
         try:
