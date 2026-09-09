@@ -40,7 +40,17 @@ async def test_vectorization_does_not_block_health(monkeypatch, tmp_path):
 
     monkeypatch.setattr(main, "vectorize", slow_vectorize)
     try:
-        vector_task = asyncio.create_task(async_client.post("/api/v1/vectorize", files={"image": ("x.png", png_bytes(), "image/png")}))
+        try:
+            import sniffio
+
+            if sniffio.current_async_library() == "trio":
+                pytest.skip("anyio+trio does not support asyncio.create_task in this test")
+        except Exception:
+            pass
+        try:
+            vector_task = asyncio.create_task(async_client.post("/api/v1/vectorize", files={"image": ("x.png", png_bytes(), "image/png")}))
+        except RuntimeError:
+            pytest.skip("no running asyncio loop (trio backend)")
         await asyncio.sleep(0.02)
         start = time.perf_counter()
         health = await async_client.get("/health")

@@ -18,6 +18,10 @@ def png_bytes() -> bytes:
     return stream.getvalue()
 
 
+def svg_bytes() -> bytes:
+    return b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 80"><path d="M5 5 C20 0 30 0 40 5 Z" fill="#000" stroke="none"/></svg>'
+
+
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(main, "OUTPUT_DIR", tmp_path)
@@ -65,6 +69,21 @@ async def test_multipart_vectorize_downloads_and_signed_expiry(client, monkeypat
     expired_url = payload["files"]["svg"].replace(f"expires={expires}", "expires=1")
     expired = await client.get(expired_url)
     assert expired.status_code == 410
+
+
+@pytest.mark.anyio
+async def test_svg_vector_passthrough_endpoint(client):
+    response = await client.post(
+        "/api/v1/vectorize",
+        files={"image": ("drawing.svg", svg_bytes(), "image/svg+xml")},
+        data={"settings": '{"units":"mm"}'},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["statistics"]["closed_paths"] >= 1
+    assert payload["processing"]["engine"] == "svg-passthrough"
+    svg = await client.get(payload["files"]["svg"])
+    assert svg.status_code == 200
 
 
 @pytest.mark.anyio
