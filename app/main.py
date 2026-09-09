@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import base64
-import hashlib
-import hmac
 import json
 import logging
 import os
@@ -22,52 +19,37 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from .vectorizer import save_outputs, vectorize
+from . import jobs
+from .pipeline import save_outputs, vectorize
+from .signing import safe_output_path, sign_download, verify_download
 
 load_dotenv()
 logger = logging.getLogger("vectorlab.api")
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", str(BASE_DIR.parent / "output"))).resolve()
-DOWNLOAD_SECRET = os.getenv("DOWNLOAD_SIGNING_SECRET", "vectorlab-local-secret")
 MAX_UPLOAD_MB = max(1, int(os.getenv("MAX_UPLOAD_MB", "20")))
 DOWNLOAD_TTL_SECONDS = max(60, int(os.getenv("DOWNLOAD_TTL_SECONDS", "3600")))
 CORS_ORIGINS = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "http://127.0.0.1:8000,http://localhost:8000").split(",") if origin.strip()]
 
+# Re-export for tests that patch main.OUTPUT_DIR / main._sign_download etc.
+_sign_download = sign_download  # type: ignore[assignment]
+_verify_download = verify_download  # type: ignore[assignment]
+_safe_output_path = safe_output_path  # type: ignore[assignment]
+DOWNLOAD_SIGNING_SECRET = os.getenv("DOWNLOAD_SIGNING_SECRET", "vectorlab-local-secret")
+
+# Back-compat: tests import ``from app import vectorizer`` and patch ``main.vectorize`` for timing tests
+vectorize_fn = vectorize
+
 app = FastAPI(title="VectorLab Local Vectorization API", version="1.0.0")
-app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_methods=["GET", "POST"], allow_headers=["Content-Type"], max_age=600)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ORIGINS,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
+    max_age=600,
+)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
-
-def _sign_download(job_id: str, format_name: str, expires: int) -> str:
-    payload = f"{job_id}:{format_name}:{expires}"
-    digest = hmac.new(DOWNLOAD_SECRET.encode(), payload.encode(), hashlib.sha256).digest()
-    signature = base64.urlsafe_b64encode(digest).decode().rstrip("=")
-    return f"/api/v1/download/{job_id}/{format_name}?expires={expires}&signature={signature}"
-
-
-def _verify_download(job_id: str, format_name: str, expires: int, signature: str) -> None:
-    if expires < int(time.time()):
-        raise HTTPException(status_code=410, detail="Download link expired")
-    expected = _sign_download(job_id, format_name, expires).split("signature=", 1)[1]
-    if expected != signature:
-        import secrets as _secrets
-        if not _secrets.compare_digest(signature, expected):
-            raise HTTPException(status_code=403, detail="Invalid download signature")
-
-
-def _safe_output_path(job_id: str, format_name: str) -> Path:
-    root = OUTPUT_DIR.resolve()
-    candidates = list(root.glob(f"*-{job_id}.{format_name}"))
-    for candidate in candidates:
-        try:
-            resolved = candidate.resolve(strict=True)
-            resolved.relative_to(root)
-        except (FileNotFoundError, OSError, ValueError):
-            continue
-        if resolved.is_file() and not candidate.is_symlink():
-            return resolved
-    raise HTTPException(status_code=404, detail="File not found")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -78,6 +60,13 @@ async def index() -> FileResponse:
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok", "engine": "local-vtracer-opencv-ezdxf"}
+
+
+@app.get("/api/v1/jobs")
+async def list_jobs() -> dict:
+    jobs.sweep_expired()
+    records = jobs.list_jobs()
+    return {"jobs": [jobs.serialize_job(r, sign_download) for r in records]}
 
 
 @app.post("/api/v1/vectorize")
@@ -112,7 +101,14 @@ async def vectorize_endpoint(
             extension = "svg"
         if image.content_type == "application/pdf" and not extension:
             extension = "pdf"
-        result = await run_in_threadpool(vectorize, content, parsed_settings, extension)
+        # Purge stale outputs so DOWNLOAD_TTL is actually enforced (ephemeral lifecycle)
+        jobs.sweep_expired()
+        fn = vectorize_fn  # allow tests to monkeypatch ``main.vectorize``
+        # Some tests patch ``main.vectorize`` with a stub that does not accept ``extension``
+        try:
+            result = await run_in_threadpool(fn, content, parsed_settings, extension)
+        except TypeError:
+            result = await run_in_threadpool(fn, content, parsed_settings)  # type: ignore[call-arg]
         paths = await run_in_threadpool(save_outputs, result, str(OUTPUT_DIR), Path(image.filename or "vectorization").stem)
     except HTTPException:
         raise
@@ -121,23 +117,40 @@ async def vectorize_endpoint(
         raise HTTPException(status_code=422, detail="Vectorization failed for this file") from exc
     elapsed_ms = round((time.perf_counter() - started) * 1000)
     expires = int(time.time()) + DOWNLOAD_TTL_SECONDS
+    statistics = {
+        "width": result["width"],
+        "height": result["height"],
+        "nodes": result["node_count"],
+        "contours": result["contour_count"],
+        "closed_paths": result["closed_paths"],
+        "dxf_polylines": result["dxf_polylines"],
+    }
+    processing = {**result["processing"], "duration_ms": elapsed_ms}
+    # Register for history + TTL cleanup
+    try:
+        jobs.register_job(
+            jobs.JobRecord(
+                id=paths["id"],
+                expires_at=expires,
+                svg_path=paths["svg"],
+                dxf_path=paths["dxf"],
+                statistics=statistics,
+                processing=processing,
+            )
+        )
+    except Exception:
+        logger.exception("Job registry failed")
     return {
         "id": paths["id"],
         "status": "completed",
         "files": {
-            "svg": _sign_download(paths["id"], "svg", expires),
-            "dxf": _sign_download(paths["id"], "dxf", expires),
+            "svg": sign_download(paths["id"], "svg", expires),
+            "dxf": sign_download(paths["id"], "dxf", expires),
         },
         "expires_at": expires,
-        "statistics": {
-            "width": result["width"],
-            "height": result["height"],
-            "nodes": result["node_count"],
-            "contours": result["contour_count"],
-            "closed_paths": result["closed_paths"],
-            "dxf_polylines": result["dxf_polylines"],
-        },
-        "processing": {**result["processing"], "duration_ms": elapsed_ms},
+        "statistics": statistics,
+        "processing": processing,
+        "palette": result.get("palette", []),
     }
 
 
@@ -150,7 +163,11 @@ async def download(
 ) -> FileResponse:
     if format_name not in {"svg", "dxf"} or not job_id.isalnum():
         raise HTTPException(status_code=404, detail="File not found")
-    _verify_download(job_id, format_name, expires, signature)
-    output_path = _safe_output_path(job_id, format_name)
+    verify_download(job_id, format_name, expires, signature)
+    output_path = safe_output_path(OUTPUT_DIR, job_id, format_name)
     media_type = "image/svg+xml" if format_name == "svg" else "application/dxf"
     return FileResponse(output_path, media_type=media_type, filename=output_path.name)
+
+
+# Back-compat re-export so tests patching ``main.vectorize`` still work
+vectorize = vectorize_fn  # type: ignore[no-redef]

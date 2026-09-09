@@ -42,3 +42,12 @@ def test_static_ui_supports_free_presigned_downloads():
     assert "payload.files.dxf" in html
     assert "compareVector" in html
     assert "zoomIn" in html and "zoomOut" in html
+
+
+def test_static_ui_has_batch_queue_and_professional_controls():
+    html = UI.read_text(encoding="utf-8")
+    for element_id in ["vectorizeAllButton", "palettePreview", "colorPrecision", "layerDifference", "historyList"]:
+        assert f'id="{element_id}"' in html
+    for token in ["Store", "Queue", "Preview", "Api", "localStorage", "AbortController"]:
+        assert token in html
+    assert "__vectorlab" in html

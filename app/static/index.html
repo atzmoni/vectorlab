@@ -45,8 +45,8 @@
     .avatar { height: 29px; width: 29px; border-radius: 50%; border: 1px solid #607086; display: grid; place-items: center; color: #aab9ce; font-size: 11px; background: #202b3b; }
     .workspace { display: grid; grid-template-columns: 276px minmax(460px, 1fr) 303px; min-height: calc(100vh - 67px); }
     .sidebar { background: var(--surface); }
-    .left-panel { border-right: 1px solid var(--line-soft); padding: 25px 18px 18px; }
-    .right-panel { border-left: 1px solid var(--line-soft); padding: 24px 19px; }
+    .left-panel { border-right: 1px solid var(--line-soft); padding: 25px 18px 18px; overflow-y:auto; }
+    .right-panel { border-left: 1px solid var(--line-soft); padding: 24px 19px; overflow-y:auto; }
     .panel-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 19px; }
     .panel-title { font-size: 13px; letter-spacing: .01em; font-weight: 650; }
     .panel-kicker { color: var(--faint); font-size: 10px; text-transform: uppercase; letter-spacing: .11em; }
@@ -74,6 +74,8 @@
     .toggle i { display: block; width: 13px; height: 13px; border-radius: 50%; background: #8a98a9; transition: .2s; }
     .toggle.on { background: var(--blue); }
     .toggle.on i { transform: translateX(11px); background: white; }
+    .palette { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+    .swatch { width:18px; height:18px; border-radius:4px; border:1px solid #2a3647; box-shadow:0 1px 3px rgba(0,0,0,.3); }
     .stage { min-width: 0; padding: 24px 28px 26px; display: flex; flex-direction: column; }
     .stage-toolbar { height: 35px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
     .crumb { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; }
@@ -92,6 +94,7 @@
     .dropzone small { display: block; margin-top: 13px; color: var(--faint); font-size: 10px; }
     .primary { border: 0; border-radius: 5px; padding: 10px 16px; background: var(--blue-strong); color: white; font-size: 11px; font-weight: 650; box-shadow: 0 6px 15px rgba(56,108,241,.2); }
     .primary:hover { background: #4a7bfa; }
+    .primary:disabled { opacity:.45; cursor:not-allowed; }
     .ghost { border: 1px solid var(--line); border-radius: 5px; background: #161e29; color: #b9c4d1; padding: 9px 13px; font-size: 11px; }
     .ghost:hover { border-color: #536781; color: white; }
     input[type="file"] { display: none; }
@@ -115,9 +118,9 @@
     .compare-line { position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; background: var(--blue); box-shadow: 0 0 0 1px rgba(0,0,0,.25); }
     .compare-handle { position: absolute; top: 50%; left: 50%; width: 24px; height: 24px; transform: translate(-50%, -50%); border: 2px solid white; border-radius: 50%; background: var(--blue); box-shadow: 0 2px 8px #000; display: grid; place-items: center; font-size: 11px; }
     .compare-range { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: ew-resize; z-index: 2; }
-    .preview-actions { margin-top: 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .preview-actions { margin-top: 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap:wrap; }
     .subtle { color: var(--faint); font-size: 10px; }
-    .action-group { display: flex; gap: 8px; }
+    .action-group { display: flex; gap: 8px; flex-wrap:wrap; }
     .download { border: 1px solid #355487; border-radius: 5px; background: #1d3159; color: #cfe0ff; padding: 8px 13px; font-size: 10px; font-weight: 600; }
     .download:disabled { opacity: .42; cursor: not-allowed; }
     .download:hover:not(:disabled) { background: #29457c; }
@@ -129,13 +132,18 @@
     .queue-heading h2 { font-size: 13px; margin: 0; font-weight: 650; }
     .queue-count { color: var(--blue); background: var(--blue-soft); border-radius: 11px; padding: 3px 8px; font-size: 10px; }
     .queue-list { display: flex; flex-direction: column; gap: 10px; padding-top: 15px; }
-    .queue-item { display: grid; grid-template-columns: 52px minmax(0,1fr) 20px; align-items: center; gap: 10px; padding: 8px; border: 1px solid var(--line-soft); background: #151b23; border-radius: 6px; }
+    .queue-item { display: grid; grid-template-columns: 52px minmax(0,1fr) 24px; align-items: center; gap: 10px; padding: 8px; border: 1px solid var(--line-soft); background: #151b23; border-radius: 6px; }
     .queue-item.active { border-color: #33518d; background: #151f31; }
+    .queue-item.vectorizing { border-color: #4a5f8a; }
     .thumb { width: 52px; height: 43px; display: grid; place-items: center; overflow: hidden; border-radius: 4px; background: #e7ebf0; background-image: linear-gradient(45deg,#d6dbe2 25%,transparent 25%),linear-gradient(-45deg,#d6dbe2 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#d6dbe2 75%),linear-gradient(-45deg,transparent 75%,#d6dbe2 75%); background-size: 10px 10px; background-position: 0 0,0 5px,5px -5px,-5px 0; }
     .thumb img, .thumb svg { max-width: 100%; max-height: 100%; object-fit: contain; }
     .queue-meta { min-width: 0; }
     .queue-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #cbd4df; font-size: 10px; margin-bottom: 5px; }
     .queue-status { display: flex; align-items: center; gap: 5px; font-size: 9px; color: var(--muted); }
+    .queue-actions { display:flex; gap:4px; flex-direction:column; }
+    .qbtn { border:1px solid #2a3647; background:#1a2330; color:#9ab0cc; border-radius:4px; font-size:9px; padding:3px 5px; }
+    .qbtn:hover { border-color:#4a648c; color:white; }
+    .qbtn:disabled { opacity:.4; cursor:not-allowed; }
     .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--faint); }
     .dot.green { background: var(--green); box-shadow: 0 0 7px rgba(72,213,151,.6); }
     .dot.orange { background: var(--orange); }
@@ -143,6 +151,8 @@
     .queue-menu { border: 0; background: transparent; color: var(--faint); font-size: 15px; padding: 2px; }
     .queue-menu:hover { color: white; }
     .queue-empty { color: var(--faint); font-size: 10px; line-height: 1.5; padding: 18px 4px; }
+    .history-heading { display:flex; align-items:center; justify-content:space-between; margin-top:18px; padding-top:14px; border-top:1px solid var(--line-soft); }
+    .history-heading h3 { font-size:11px; margin:0; color:var(--muted); letter-spacing:.04em; text-transform:uppercase; }
     .progress { height: 3px; background: #283341; border-radius: 4px; overflow: hidden; margin-top: 7px; }
     .progress i { display: block; height: 100%; width: 45%; border-radius: 4px; background: var(--blue); animation: progress 1.2s ease-in-out infinite alternate; }
     @keyframes progress { from { width: 22%; } to { width: 84%; } }
@@ -174,6 +184,14 @@
           <div class="control"><div class="control-row"><label for="corners">Corner suppression</label><span class="value" id="cornersValue">35%</span></div><input id="corners" type="range" min="0" max="100" value="35" /></div>
           <div class="control"><div class="control-row"><label for="noise">Noise filter</label><span class="value" id="noiseValue">2</span></div><input id="noise" type="range" min="0" max="8" value="2" /></div>
         </section>
+        <section class="section" id="colorPrecisionSection" style="display:none">
+          <div class="section-label">Color precision — VTracer professional</div>
+          <div class="control"><div class="control-row"><label for="colorPrecision">Color precision</label><span class="value" id="colorPrecisionValue">6</span></div><input id="colorPrecision" type="range" min="1" max="8" value="6" /></div>
+          <div class="control"><div class="control-row"><label for="layerDifference">Layer difference</label><span class="value" id="layerDifferenceValue">16</span></div><input id="layerDifference" type="range" min="2" max="64" step="2" value="16" /></div>
+          <div class="control"><div class="control-row"><label for="cornerThreshold">Corner threshold</label><span class="value" id="cornerThresholdValue">60°</span></div><input id="cornerThreshold" type="range" min="0" max="180" step="15" value="60" /></div>
+          <div class="control"><div class="control-row"><label for="spliceThreshold">Splice threshold</label><span class="value" id="spliceThresholdValue">45°</span></div><input id="spliceThreshold" type="range" min="0" max="180" step="15" value="45" /></div>
+          <div class="control"><div class="control-row"><label>Palette preview</label><span class="value" id="paletteHint" style="color:var(--faint)">after vectorize</span></div><div class="palette" id="palettePreview" aria-live="polite"></div></div>
+        </section>
         <section class="section">
           <div class="control"><div class="control-row"><label for="units">Document units</label></div><div class="select-wrap"><select id="units"><option value="mm">Millimeters (mm)</option><option value="in">Inches (in)</option></select></div></div>
           <div class="toggle-row"><span>Simplify paths</span><button class="toggle on" id="simplify" aria-label="Toggle simplify paths"><i></i></button></div>
@@ -189,92 +207,438 @@
             <div class="preview-card"><div class="preview-head"><span>Optimized SVG</span><span class="badge" id="vectorStatus">READY</span></div><div class="canvas" id="vectorCanvas"><div class="empty-vector"><strong>Ready to vectorize</strong>Adjust settings, then run the local engine.</div></div></div>
           </div>
           <div class="compare" id="compare"><img id="compareRaster" alt="Original raster comparison" /><div class="compare-vector" id="compareVector"></div><div class="compare-line" id="compareLine"></div><div class="compare-handle">↔</div><input class="compare-range" id="compareRange" type="range" min="0" max="100" value="50" aria-label="Compare original and vector" /></div>
-          <div class="preview-actions"><span class="subtle" id="statsText">Waiting for a source image</span><div class="action-group"><button class="ghost" id="resetButton">Reset</button><button class="primary" id="vectorizeButton">Vectorize image</button><button class="download" id="svgButton" disabled>↓ SVG</button><button class="download" id="dxfButton" disabled>↓ DXF</button></div></div>
+          <div class="preview-actions"><span class="subtle" id="statsText">Waiting for a source image</span><div class="action-group"><button class="ghost" id="resetButton">Reset</button><button class="primary" id="vectorizeButton">Vectorize image</button><button class="primary" id="vectorizeAllButton" title="Vectorize every queued file">Vectorize All</button><button class="download" id="svgButton" disabled>↓ SVG</button><button class="download" id="dxfButton" disabled>↓ DXF</button></div></div>
         </div>
         <div class="empty-state" id="emptyState"><svg width="37" height="37" viewBox="0 0 37 37" fill="none" aria-hidden="true"><path d="M8 27.5h21M8 21.5h12M8 15.5h21M5.5 5.5h26v26h-26z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="m23.5 21 3-3 4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>Your workspace is empty</h3><p>Upload an image to see a side-by-side preview and start tuning your vector.</p></div>
       </section>
-      <aside class="sidebar right-panel" id="history"><div class="queue-heading"><h2>Conversion queue</h2><span class="queue-count" id="queueCount">0 files</span></div><div class="queue-list" id="queueList"><div class="queue-empty" id="queueEmpty">Your recent vectorizations will appear here.</div></div></aside>
+      <aside class="sidebar right-panel" id="history"><div class="queue-heading"><h2>Conversion queue</h2><span class="queue-count" id="queueCount">0 files</span></div><div class="queue-list" id="queueList"><div class="queue-empty" id="queueEmpty">Your recent vectorizations will appear here.</div></div><div class="history-heading"><h3>History (local)</h3><button class="qbtn" id="clearHistoryBtn" title="Clear stored history">Clear</button></div><div class="queue-list" id="historyList"><div class="queue-empty">Past vectors persist here after reload.</div></div></aside>
     </main>
+    <section id="api" style="max-width:860px;margin:28px auto;padding:18px 22px;border:1px solid var(--line-soft);border-radius:8px;background:var(--surface);">
+      <h3 style="margin:0 0 8px;font-size:13px">API — free local engine</h3>
+      <p style="margin:0;color:var(--muted);font-size:11px;line-height:1.6">No auth. <code>POST /api/v1/vectorize</code> multipart <code>image</code> + <code>settings</code> JSON (mode/threshold/tolerance/corner_suppression/noise_filter/simplify/invert/units plus <code>color_precision</code>/<code>layer_difference</code>/<code>corner_threshold</code>/<code>splice_threshold</code> for color). Returns HMAC-signed <code>files.svg</code>/<code>files.dxf</code> expiring per <code>DOWNLOAD_TTL_SECONDS</code>. History at <code>GET /api/v1/jobs</code>. DXF is R2000 closed <code>SPLINE</code> + <code>HATCH</code>, units <code>mm/in</code>.</p>
+    </section>
     <div class="toast" id="toast"></div>
   </div>
-  <script>
-    const state = { files: [], activeIndex: 0, mode: 'monochrome', result: null, objectUrl: null, zoom: 1, results: new Map(), objectUrls: new Map() };
-    const $ = (id) => document.getElementById(id);
-    const dropzone = $('dropzone'), fileInput = $('fileInput'), previewWrap = $('previewWrap'), emptyState = $('emptyState');
-    const toast = (message, error = false) => { const el = $('toast'); el.textContent = message; el.className = `toast show${error ? ' error' : ''}`; clearTimeout(window.toastTimer); window.toastTimer = setTimeout(() => el.className = 'toast', 3600); };
-    const updateRange = (input) => input.style.setProperty('--fill', `${((input.value - input.min) / (input.max - input.min)) * 100}%`);
-    const bindRange = (id, output, format = (value) => value) => { const input = $(id); const sync = () => { $(output).textContent = format(input.value); updateRange(input); }; input.addEventListener('input', sync); sync(); };
-    bindRange('threshold', 'thresholdValue');
-    bindRange('tolerance', 'toleranceValue', (v) => `${Number(v).toFixed(1)} px`);
-    bindRange('corners', 'cornersValue', (v) => `${v}%`);
-    bindRange('noise', 'noiseValue');
-    document.querySelectorAll('[data-mode]').forEach((button) => button.addEventListener('click', () => { document.querySelectorAll('[data-mode]').forEach((b) => b.classList.remove('active')); button.classList.add('active'); state.mode = button.dataset.mode; }));
-    ['simplify', 'invert'].forEach((id) => $(id).addEventListener('click', () => $(id).classList.toggle('on')));
-    $('chooseButton').addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', (event) => acceptFiles([...event.target.files]));
-    ['dragenter', 'dragover'].forEach((eventName) => dropzone.addEventListener(eventName, (event) => { event.preventDefault(); dropzone.classList.add('drag'); }));
-    ['dragleave', 'drop'].forEach((eventName) => dropzone.addEventListener(eventName, (event) => { event.preventDefault(); dropzone.classList.remove('drag'); }));
-    dropzone.addEventListener('drop', (event) => acceptFiles([...event.dataTransfer.files]));
-    function acceptFiles(files) {
-      const byExt = (name) => (name.split('.').pop() || '').toLowerCase();
-      const isVectorName = (name) => ['svg','pdf'].includes(byExt(name));
-      const accepted = files.filter((file) => ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml', 'application/pdf'].includes(file.type) || isVectorName(file.name));
-      if (!accepted.length) return toast('Please choose a PNG, JPG, WEBP, SVG, or PDF file.', true);
-      accepted.forEach((file) => { if (!state.objectUrls.has(file)) state.objectUrls.set(file, URL.createObjectURL(file)); }); state.files = [...state.files, ...accepted]; state.activeIndex = state.files.length - accepted.length; state.result = null;
-      renderSource(); renderQueue(); toast(`${accepted.length} image${accepted.length > 1 ? 's' : ''} added to the queue.`);
-    }
-    function renderSource() {
-      if (!state.files.length) return;
-      dropzone.classList.add('hidden'); emptyState.style.display = 'none'; previewWrap.classList.add('visible');
-      const file = state.files[state.activeIndex]; state.objectUrl = state.objectUrls.get(file) || URL.createObjectURL(file); state.objectUrls.set(file, state.objectUrl); state.result = state.results.get(file) || null;
-      $('fileCrumb').textContent = file.name; $('vectorStatus').textContent = 'READY';
-      const isVectorFile = (f) => (f.type === 'image/svg+xml' || f.type === 'application/pdf' || /\.(svg|pdf)$/i.test(f.name));
-      $('sourceType').textContent = isVectorFile(file) ? 'VECTOR SOURCE' : file.type.split('/')[1].toUpperCase();
-      if (isVectorFile(file) && file.name.toLowerCase().endsWith('.svg')) {
-        // For SVG source render directly without extra fetch
-        $('rasterCanvas').innerHTML = `<img src="${state.objectUrl}" alt="${escapeHtml(file.name)}" id="rasterPreview" />`;
-      } else if (isVectorFile(file)) {
-        $('rasterCanvas').innerHTML = `<div class="empty-vector"><strong>${escapeHtml(file.name)}</strong>PDF vector source — will extract every curve precisely.</div>`;
-      } else {
-        $('rasterCanvas').innerHTML = `<img src="${state.objectUrl}" alt="${escapeHtml(file.name)}" id="rasterPreview" />`;
+  <script type="module">
+    /* =======================================================================
+     * DESIGN: four owners, one state each — Store owns entries by stable id,
+     * Api owns fetch/signing, Preview owns DOM for the active entry,
+     * Queue owns batch orchestration. No Map<File> leak.
+     * ===================================================================== */
+
+    // ---------- Store — single owner of queue entries + persistence ----------
+    const LS_KEY = "vectorlab:queue:v1";
+    const LS_HIST = "vectorlab:history:v1";
+    const Store = {
+      entries: /** @type {Array<{id:string,file:File|null,name:string,size:number,type:string,objectUrl:string|null,status:string,payload:any,svgUrl:string|null,error:string|null,controller:AbortController|null}>} */([]),
+      activeId: null,
+      mode: "monochrome",
+      zoom: 1,
+      makeId(){ return Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4); },
+      getActive(){ return this.entries.find(e=>e.id===this.activeId) || this.entries[0] || null; },
+      setActive(id){ this.activeId=id; },
+      addFiles(fileList){
+        const ids=[];
+        for(const f of fileList){
+          const id=this.makeId();
+          let url=null;
+          try{ url=URL.createObjectURL(f); }catch{}
+          this.entries.push({id,file:f,name:f.name,size:f.size,type:f.type,objectUrl:url,status:"queued",payload:null,svgUrl:null,error:null,controller:null});
+          ids.push(id);
+        }
+        if(ids.length) this.activeId=ids[0];
+        this.persist();
+        return ids;
+      },
+      remove(id){
+        const idx=this.entries.findIndex(e=>e.id===id);
+        if(idx===-1) return;
+        const e=this.entries[idx];
+        try{ if(e.objectUrl) URL.revokeObjectURL(e.objectUrl); }catch{}
+        try{ if(e.svgUrl) URL.revokeObjectURL(e.svgUrl); }catch{}
+        try{ e.controller?.abort(); }catch{}
+        this.entries.splice(idx,1);
+        if(this.activeId===id) this.activeId=this.entries[0]?.id||null;
+        this.persist();
+      },
+      update(id, patch){
+        const e=this.entries.find(x=>x.id===id);
+        if(e) Object.assign(e,patch);
+        this.persist();
+      },
+      persist(){
+        try{
+          const slim=this.entries.map(e=>({id:e.id,name:e.name,size:e.size,type:e.type,status:e.status,error:e.error,payload:e.payload?{id:e.payload.id,statistics:e.payload.statistics,processing:e.payload.processing,palette:e.payload.palette,expires_at:e.payload.expires_at,files:e.payload.files}:null}));
+          localStorage.setItem(LS_KEY, JSON.stringify({activeId:this.activeId,entries:slim}));
+        }catch{}
+      },
+      loadPersisted(){
+        try{
+          const raw=localStorage.getItem(LS_KEY);
+          if(!raw) return;
+          const obj=JSON.parse(raw);
+          // Only restore history payloads (files themselves are ephemeral); rehydrate as history items, not runnable entries.
+          if(Array.isArray(obj.entries)){
+            const hist=this.loadHistory();
+            for(const s of obj.entries){
+              if(s.payload && !hist.some(h=>h.id===s.payload.id)) hist.push({name:s.name, payload:s.payload});
+            }
+            this.saveHistory(hist);
+          }
+        }catch{}
+      },
+      loadHistory(){
+        try{ return JSON.parse(localStorage.getItem(LS_HIST)||"[]"); }catch{ return []; }
+      },
+      saveHistory(list){
+        try{ localStorage.setItem(LS_HIST, JSON.stringify(list.slice(0,40))); }catch{}
+      },
+      clearHistory(){
+        try{ localStorage.removeItem(LS_HIST); localStorage.removeItem(LS_KEY); }catch{}
+        this.entries.forEach(e=>{
+          try{ if(e.objectUrl) URL.revokeObjectURL(e.objectUrl);}catch{}
+          try{ if(e.svgUrl) URL.revokeObjectURL(e.svgUrl);}catch{}
+        });
+        this.entries=[]; this.activeId=null; this.persist();
       }
-      $('vectorCanvas').innerHTML = state.result?.svgUrl ? `<img src="${state.result.svgUrl}" alt="Generated optimized SVG" id="svgPreview" />` : '<div class="empty-vector"><strong>Ready to vectorize</strong>Adjust settings, then run the local engine.</div>';
-      if (state.result) { $('vectorStatus').textContent = 'COMPLETE'; $('svgButton').disabled = false; $('dxfButton').disabled = false; $('statsText').textContent = `${state.result.payload.statistics.nodes.toLocaleString()} nodes · ${state.result.payload.statistics.contours} closed contours · ${state.result.payload.processing.duration_ms} ms`; bindResultDownloads(state.result.payload, file); } else { $('vectorStatus').textContent = 'READY'; $('svgButton').disabled = true; $('dxfButton').disabled = true; $('statsText').textContent = `${formatBytes(file.size)} · ${file.type.split('/')[1].toUpperCase()} source`; }
-      $('compare').style.display = 'none'; $('previewGrid').style.display = 'grid';
+    };
+
+    // ---------- Api — single owner of fetch/signing ----------
+    const Api = {
+      async fetchJson(url, opts){
+        const r=await fetch(url, opts);
+        let body=null;
+        const ct=r.headers.get("content-type")||"";
+        try{ body= ct.includes("json") ? await r.json() : JSON.parse(await r.text()); }catch{ body={detail: await r.text().catch(()=>"request failed")}; }
+        if(!r.ok) throw new Error(body.detail || body.message || `HTTP ${r.status}`);
+        return body;
+      },
+      async vectorize(entry, settings, signal){
+        const fd=new FormData();
+        if(!entry.file) throw new Error("File no longer available — re-add it");
+        fd.append("image", entry.file);
+        fd.append("settings", JSON.stringify(settings));
+        const payload=await this.fetchJson("/api/v1/vectorize",{method:"POST", body:fd, signal});
+        // fetch svg preview for display
+        let svgUrl=null;
+        try{
+          const rr=await fetch(payload.files.svg, {signal});
+          if(!rr.ok) throw new Error("SVG preview download failed");
+          const txt=await rr.text();
+          const blob=new Blob([txt],{type:"image/svg+xml"});
+          svgUrl=URL.createObjectURL(blob);
+        }catch(e){ if(e.name==="AbortError") throw e; }
+        return {payload, svgUrl};
+      },
+      async fetchJobs(){
+        try{ const j=await this.fetchJson("/api/v1/jobs"); return j.jobs||[]; }catch{ return []; }
+      }
+    };
+
+    // ---------- helpers ----------
+    const $=id=>document.getElementById(id);
+    const dropzone=$("dropzone"), fileInput=$("fileInput"), previewWrap=$("previewWrap"), emptyState=$("emptyState");
+    const toast=(msg,err=false)=>{ const el=$("toast"); el.textContent=msg; el.className=`toast show${err?" error":""}`; clearTimeout(window.toastTimer); window.toastTimer=setTimeout(()=>el.className="toast",3600); };
+    const updateRange=input=>input.style.setProperty("--fill", `${((input.value-input.min)/(input.max-input.min))*100}%`);
+    const bindRange=(id,out,fmt=v=>v)=>{ const inp=$(id); const sync=()=>{ const el=$(out); if(el) el.textContent=fmt(inp.value); updateRange(inp); }; inp.addEventListener("input", sync); sync(); };
+
+    // ranges
+    bindRange("threshold","thresholdValue");
+    bindRange("tolerance","toleranceValue",v=>`${Number(v).toFixed(1)} px`);
+    bindRange("corners","cornersValue",v=>`${v}%`);
+    bindRange("noise","noiseValue");
+    bindRange("colorPrecision","colorPrecisionValue");
+    bindRange("layerDifference","layerDifferenceValue");
+    bindRange("cornerThreshold","cornerThresholdValue",v=>`${v}°`);
+    bindRange("spliceThreshold","spliceThresholdValue",v=>`${v}°`);
+
+    function refreshColorSection(){
+      const show = Store.mode==="color";
+      const sec=$("colorPrecisionSection");
+      if(sec) sec.style.display = show ? "block" : "none";
     }
-    function renderQueue(activeStatus = 'Queued') {
-      const list = $('queueList'); $('queueCount').textContent = `${state.files.length} file${state.files.length === 1 ? '' : 's'}`;
-      if (!state.files.length) { list.innerHTML = '<div class="queue-empty">Your recent vectorizations will appear here.</div>'; return; }
-      list.innerHTML = state.files.map((file, index) => { const itemStatus = index === state.activeIndex ? activeStatus : (state.results.has(file) ? 'Completed' : 'Queued'); const dot = itemStatus === 'Completed' ? 'green' : itemStatus === 'Vectorizing' ? 'orange' : itemStatus === 'Error' ? 'red' : ''; return `<div class="queue-item ${index === state.activeIndex ? 'active' : ''}" data-index="${index}"><div class="thumb"><img src="${state.objectUrls.get(file) || ''}" alt="" /></div><div class="queue-meta"><div class="queue-name">${escapeHtml(file.name)}</div><div class="queue-status"><i class="dot ${dot}"></i>${itemStatus}</div>${index === state.activeIndex && activeStatus === 'Vectorizing' ? '<div class="progress"><i></i></div>' : ''}</div><button class="queue-menu" aria-label="Remove file" data-remove="${index}">⋮</button></div>`; }).join('');
-      list.querySelectorAll('.queue-item').forEach((item) => item.addEventListener('click', (event) => { if (event.target.dataset.remove !== undefined) return; state.activeIndex = Number(item.dataset.index); state.result = null; renderSource(); renderQueue(); }));
-      list.querySelectorAll('[data-remove]').forEach((button) => button.addEventListener('click', (event) => { event.stopPropagation(); const index = Number(button.dataset.remove); const file = state.files[index]; const sourceUrl = state.objectUrls.get(file); const result = state.results.get(file); if (sourceUrl) URL.revokeObjectURL(sourceUrl); if (result) URL.revokeObjectURL(result.svgUrl); state.objectUrls.delete(file); state.results.delete(file); state.files.splice(index, 1); state.activeIndex = Math.max(0, Math.min(state.activeIndex, state.files.length - 1)); state.result = null; if (state.files.length) renderSource(); else reset(); renderQueue(); }));
+    document.querySelectorAll("[data-mode]").forEach(btn=>btn.addEventListener("click",()=>{
+      document.querySelectorAll("[data-mode]").forEach(b=>b.classList.remove("active"));
+      btn.classList.add("active");
+      Store.mode=btn.dataset.mode;
+      refreshColorSection();
+    }));
+    ["simplify","invert"].forEach(id=> $(id).addEventListener("click", ()=> $(id).classList.toggle("on")));
+    refreshColorSection();
+
+    $("chooseButton").addEventListener("click", ()=> fileInput.click());
+    fileInput.addEventListener("change", e=> acceptFiles([...e.target.files]));
+    ["dragenter","dragover"].forEach(n=> dropzone.addEventListener(n, e=>{ e.preventDefault(); dropzone.classList.add("drag"); }));
+    ["dragleave","drop"].forEach(n=> dropzone.addEventListener(n, e=>{ e.preventDefault(); dropzone.classList.remove("drag"); }));
+    dropzone.addEventListener("drop", e=> acceptFiles([...e.dataTransfer.files]));
+
+    function acceptFiles(files){
+      const byExt=n=> (n.split(".").pop()||"").toLowerCase();
+      const isVec=n=> ["svg","pdf"].includes(byExt(n));
+      const ok=files.filter(f=> ["image/png","image/jpeg","image/webp","image/svg+xml","application/pdf"].includes(f.type) || isVec(f.name));
+      if(!ok.length) return toast("Please choose a PNG, JPG, WEBP, SVG, or PDF file.", true);
+      Store.addFiles(ok);
+      Preview.renderSource();
+      Queue.render();
+      Queue.renderHistory();
+      toast(`${ok.length} file${ok.length>1?"s":""} added to the queue.`);
     }
-    function escapeHtml(value) { return value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char])); }
-    function formatBytes(bytes) { if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`; return `${(bytes / (1024 * 1024)).toFixed(1)} MB`; }
-    function settings() { return { mode: state.mode, threshold: Number($('threshold').value), tolerance: Number($('tolerance').value), corner_suppression: Number($('corners').value) / 100, noise_filter: Number($('noise').value), simplify: $('simplify').classList.contains('on'), invert: $('invert').classList.contains('on'), units: $('units').value }; }
-    $('vectorizeButton').addEventListener('click', async () => {
-      if (!state.files.length) return toast('Add an image before vectorizing.', true);
-      const file = state.files[state.activeIndex]; const button = $('vectorizeButton'); button.disabled = true; button.textContent = 'Vectorizing…'; $('vectorStatus').textContent = 'RUNNING'; renderQueue('Vectorizing');
-      const data = new FormData(); data.append('image', file); data.append('settings', JSON.stringify(settings()));
-      try {
-        const response = await fetch('/api/v1/vectorize', { method: 'POST', body: data });
-        const payload = await response.json(); if (!response.ok) throw new Error(payload.detail || 'Vectorization failed');
-        const svgResponse = await fetch(payload.files.svg); if (!svgResponse.ok) throw new Error('SVG preview download failed'); const svgText = await svgResponse.text();
-        const svgBlob = new Blob([svgText], { type: 'image/svg+xml' }); const oldResult = state.results.get(file); if (oldResult) URL.revokeObjectURL(oldResult.svgUrl); const svgUrl = URL.createObjectURL(svgBlob); const result = { payload, svgUrl }; state.result = result; state.results.set(file, result); $('vectorCanvas').innerHTML = `<img src="${svgUrl}" alt="Generated optimized SVG" id="svgPreview" />`; $('vectorStatus').textContent = 'COMPLETE'; $('statsText').textContent = `${payload.statistics.nodes.toLocaleString()} nodes · ${payload.statistics.contours} closed contours · ${payload.processing.duration_ms} ms`;
-        bindResultDownloads(payload, file); $('compareRaster').src = state.objectUrl; $('compareVector').style.backgroundImage = `url(${svgUrl})`; $('compareVector').style.backgroundSize = 'contain'; $('compareVector').style.backgroundPosition = 'center'; $('compareVector').style.backgroundRepeat = 'no-repeat'; renderQueue('Completed'); toast('Vector ready — closed contours exported for CAD/CAM.');
-      } catch (error) { $('vectorStatus').textContent = 'ERROR'; renderQueue('Error'); toast(error.message, true); } finally { button.disabled = false; button.textContent = 'Vectorize image'; }
+
+    // ---------- Preview — owner of active-entry DOM ----------
+    const Preview = {
+      renderSource(){
+        const entries=Store.entries;
+        if(!entries.length){
+          dropzone.classList.remove("hidden"); emptyState.style.display="flex"; previewWrap.classList.remove("visible");
+          $("fileCrumb").textContent="No file selected";
+          return;
+        }
+        dropzone.classList.add("hidden"); emptyState.style.display="none"; previewWrap.classList.add("visible");
+        const entry=Store.getActive();
+        if(!entry) return;
+        $("fileCrumb").textContent=entry.name;
+        const isVec = entry.type==="image/svg+xml" || entry.type==="application/pdf" || /\.(svg|pdf)$/i.test(entry.name);
+        $("sourceType").textContent = isVec ? "VECTOR SOURCE" : (entry.type.split("/")[1]||"SOURCE").toUpperCase();
+        if(isVec && entry.name.toLowerCase().endsWith(".svg")){
+          $("rasterCanvas").innerHTML=`<img src="${entry.objectUrl||""}" alt="${escapeHtml(entry.name)}" id="rasterPreview" />`;
+        } else if(isVec && entry.name.toLowerCase().endsWith(".pdf")){
+          $("rasterCanvas").innerHTML=`<div class="empty-vector"><strong>${escapeHtml(entry.name)}</strong>PDF vector source — will extract every curve precisely.</div>`;
+        } else {
+          $("rasterCanvas").innerHTML = entry.objectUrl ? `<img src="${entry.objectUrl}" alt="${escapeHtml(entry.name)}" id="rasterPreview" />` : `<div class="empty-vector">${escapeHtml(entry.name)}</div>`;
+        }
+        if(entry.svgUrl){
+          $("vectorCanvas").innerHTML=`<img src="${entry.svgUrl}" alt="Generated optimized SVG" id="svgPreview" />`;
+          $("vectorStatus").textContent="COMPLETE";
+          $("svgButton").disabled=false; $("dxfButton").disabled=false;
+          const s=entry.payload?.statistics;
+          $("statsText").textContent = s ? `${Number(s.nodes).toLocaleString()} nodes · ${s.contours} closed contours` : "Completed";
+          bindResultDownloads(entry.payload, entry);
+          this.renderPalette(entry.payload?.palette||[]);
+        } else if(entry.status==="vectorizing"){
+          $("vectorCanvas").innerHTML='<div class="empty-vector"><strong>Vectorizing…</strong>Running local engine.</div>';
+          $("vectorStatus").textContent="RUNNING";
+          $("svgButton").disabled=true; $("dxfButton").disabled=true;
+          $("statsText").textContent="Vectorizing…";
+          $("palettePreview").innerHTML="";
+          $("paletteHint").textContent="after vectorize";
+        } else if(entry.status==="error"){
+          $("vectorCanvas").innerHTML=`<div class="empty-vector"><strong>Error</strong>${escapeHtml(entry.error||"failed")}</div>`;
+          $("vectorStatus").textContent="ERROR";
+          $("svgButton").disabled=true; $("dxfButton").disabled=true;
+          $("statsText").textContent=entry.error||"Error";
+        } else {
+          $("vectorCanvas").innerHTML='<div class="empty-vector"><strong>Ready to vectorize</strong>Adjust settings, then run the local engine.</div>';
+          $("vectorStatus").textContent="READY";
+          $("svgButton").disabled=true; $("dxfButton").disabled=true;
+          $("statsText").textContent=`${formatBytes(entry.size)} · ${(entry.type.split("/")[1]||"file").toUpperCase()} source`;
+          $("palettePreview").innerHTML="";
+          $("paletteHint").textContent="after vectorize";
+        }
+        $("compare").style.display="none"; $("previewGrid").style.display="grid";
+        // compare sources
+        const cmpR=$("compareRaster"), cmpV=$("compareVector");
+        if(entry.objectUrl && cmpR) cmpR.src=entry.objectUrl;
+        if(entry.svgUrl && cmpV){
+          cmpV.style.backgroundImage=`url(${entry.svgUrl})`;
+          cmpV.style.backgroundSize="contain"; cmpV.style.backgroundPosition="center"; cmpV.style.backgroundRepeat="no-repeat";
+        }
+      },
+      renderPalette(palette){
+        const box=$("palettePreview"), hint=$("paletteHint");
+        if(!palette || !palette.length){ if(box) box.innerHTML=""; if(hint) hint.textContent="no palette"; return; }
+        if(hint) hint.textContent=`${palette.length} colors`;
+        if(box) box.innerHTML=palette.map(c=>`<span class="swatch" title="${escapeHtml(c)}" style="background:${escapeHtml(c)}"></span>`).join("");
+      }
+    };
+
+    // ---------- Queue — owner of batch orchestration ----------
+    const Queue = {
+      render(){
+        const list=$("queueList");
+        $("queueCount").textContent=`${Store.entries.length} file${Store.entries.length===1?"":"s"}`;
+        if(!Store.entries.length){ list.innerHTML='<div class="queue-empty">Your recent vectorizations will appear here.</div>'; return; }
+        list.innerHTML=Store.entries.map((e,i)=>{
+          const active = e.id===Store.activeId;
+          const dot = e.status==="completed" ? "green" : e.status==="vectorizing" ? "orange" : e.status==="error" ? "red" : "";
+          const statusLabel = e.status==="completed" ? "Completed" : e.status==="vectorizing" ? "Vectorizing" : e.status==="error" ? "Error" : "Queued";
+          const actions = e.status==="vectorizing"
+            ? `<button class="qbtn" data-cancel="${e.id}">Cancel</button>`
+            : e.status==="error"
+            ? `<button class="qbtn" data-retry="${e.id}">Retry</button><button class="qbtn" data-remove="${e.id}">Remove</button>`
+            : e.status==="completed"
+            ? `<button class="qbtn" data-download-svg="${e.id}">SVG</button><button class="qbtn" data-remove="${e.id}">✕</button>`
+            : `<button class="qbtn" data-vectorize="${e.id}">Go</button><button class="qbtn" data-remove="${e.id}">✕</button>`;
+          return `<div class="queue-item ${active?"active":""} ${e.status==="vectorizing"?"vectorizing":""}" data-id="${e.id}"><div class="thumb"><img src="${e.objectUrl||""}" alt="" onerror="this.style.display='none'" /></div><div class="queue-meta"><div class="queue-name">${escapeHtml(e.name)}</div><div class="queue-status"><i class="dot ${dot}"></i>${statusLabel}</div>${e.status==="vectorizing"?'<div class="progress"><i></i></div>':""}</div><div class="queue-actions">${actions}</div></div>`;
+        }).join("");
+        list.querySelectorAll("[data-id]").forEach(el=> el.addEventListener("click", e=>{
+          if(e.target.closest("[data-cancel]")||e.target.closest("[data-retry]")||e.target.closest("[data-remove]")||e.target.closest("[data-vectorize]")||e.target.closest("[data-download-svg]")) return;
+          Store.setActive(el.dataset.id);
+          Store.persist();
+          Preview.renderSource(); Queue.render();
+        }));
+        list.querySelectorAll("[data-cancel]").forEach(b=> b.addEventListener("click", e=>{ e.stopPropagation(); Queue.cancel(b.dataset.cancel); }));
+        list.querySelectorAll("[data-retry]").forEach(b=> b.addEventListener("click", e=>{ e.stopPropagation(); Queue.retry(b.dataset.retry); }));
+        list.querySelectorAll("[data-vectorize]").forEach(b=> b.addEventListener("click", e=>{ e.stopPropagation(); const id=b.dataset.vectorize; Store.setActive(id); Store.persist(); Preview.renderSource(); Queue.render(); Queue.vectorizeOne(Store.entries.find(x=>x.id===id)); }));
+        list.querySelectorAll("[data-remove]").forEach(b=> b.addEventListener("click", e=>{ e.stopPropagation(); Store.remove(b.dataset.remove); Preview.renderSource(); Queue.render(); Queue.renderHistory(); }));
+        list.querySelectorAll("[data-download-svg]").forEach(b=> b.addEventListener("click", e=>{ e.stopPropagation(); const ent=Store.entries.find(x=>x.id===b.dataset.downloadSvg); if(ent?.payload) downloadFile(ent.payload.files.svg, ent.name.replace(/\.[^/.]+$/,"")+".svg"); }));
+      },
+      renderHistory(){
+        const box=$("historyList");
+        if(!box) return;
+        const hist=Store.loadHistory();
+        if(!hist.length){ box.innerHTML='<div class="queue-empty">Past vectors persist here after reload.</div>'; return; }
+        box.innerHTML=hist.slice(0,12).map(h=>{
+          const p=h.payload; const s=p.statistics||{};
+          return `<div class="queue-item"><div class="thumb"><span style="font-size:15px">♡</span></div><div class="queue-meta"><div class="queue-name">${escapeHtml(h.name||p.id)}</div><div class="queue-status"><i class="dot green"></i>${s.contours||"?"} contours · ${p.palette? p.palette.length+" colors":""}</div></div><div class="queue-actions"><button class="qbtn" data-hist-svg="${p.files.svg}">SVG</button><button class="qbtn" data-hist-dxf="${p.files.dxf}">DXF</button></div></div>`;
+        }).join("");
+        box.querySelectorAll("[data-hist-svg]").forEach(b=> b.addEventListener("click", ()=> downloadFile(b.dataset.histSvg, "vector.svg")));
+        box.querySelectorAll("[data-hist-dxf]").forEach(b=> b.addEventListener("click", ()=> downloadFile(b.dataset.histDxf, "vector.dxf")));
+      },
+      async vectorizeOne(entry){
+        if(!entry) return;
+        if(entry.status==="vectorizing") return;
+        const ctrl=new AbortController();
+        Store.update(entry.id, {status:"vectorizing", error:null, controller:ctrl});
+        Preview.renderSource(); Queue.render();
+        try{
+          const settings=collectSettings();
+          const {payload, svgUrl}=await Api.vectorize(entry, settings, ctrl.signal);
+          if(entry.svgUrl) try{ URL.revokeObjectURL(entry.svgUrl);}catch{}
+          Store.update(entry.id, {status:"completed", payload, svgUrl, controller:null});
+          // persist to history
+          const hist=Store.loadHistory();
+          hist.unshift({name:entry.name, payload});
+          Store.saveHistory(hist);
+          Preview.renderSource(); Queue.render(); Queue.renderHistory();
+          toast("Vector ready — closed contours exported for CAD/CAM.");
+        }catch(err){
+          if(err.name==="AbortError"){
+            Store.update(entry.id,{status:"queued", controller:null, error:"Cancelled"});
+          } else {
+            Store.update(entry.id,{status:"error", controller:null, error: err.message||String(err)});
+            Preview.renderSource(); Queue.render();
+            toast(err.message||"Vectorization failed", true);
+            return;
+          }
+          Preview.renderSource(); Queue.render();
+        }
+      },
+      async vectorizeAll(){
+        const todo=Store.entries.filter(e=> e.status==="queued" || e.status==="error");
+        if(!todo.length) return toast("Nothing to vectorize.", true);
+        const btn=$("vectorizeAllButton"); if(btn) btn.disabled=true;
+        for(const e of todo){
+          Store.setActive(e.id);
+          Preview.renderSource(); Queue.render();
+          await Queue.vectorizeOne(e);
+          if(e.status==="error") {/* continue to next */ }
+        }
+        if(btn) btn.disabled=false;
+        Preview.renderSource(); Queue.render();
+      },
+      cancel(id){
+        const e=Store.entries.find(x=>x.id===id);
+        if(e?.controller) try{ e.controller.abort(); }catch{}
+      },
+      retry(id){
+        const e=Store.entries.find(x=>x.id===id);
+        if(e) Queue.vectorizeOne(e);
+      }
+    };
+
+    function escapeHtml(v){ return String(v).replace(/[&<>"']/g, c=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c])); }
+    function formatBytes(b){ if(b<1024*1024) return `${Math.round(b/1024)} KB`; return `${(b/(1024*1024)).toFixed(1)} MB`; }
+    function collectSettings(){
+      return {
+        mode: Store.mode,
+        threshold: Number($("threshold").value),
+        tolerance: Number($("tolerance").value),
+        corner_suppression: Number($("corners").value)/100,
+        noise_filter: Number($("noise").value),
+        simplify: $("simplify").classList.contains("on"),
+        invert: $("invert").classList.contains("on"),
+        units: $("units").value,
+        color_precision: Number($("colorPrecision").value),
+        layer_difference: Number($("layerDifference").value),
+        corner_threshold: Number($("cornerThreshold").value),
+        splice_threshold: Number($("spliceThreshold").value),
+      };
+    }
+    function bindResultDownloads(payload, entry){
+      $("svgButton").disabled=false; $("dxfButton").disabled=false;
+      $("svgButton").onclick=()=> downloadFile(payload.files.svg, `${entry.name.replace(/\.[^/.]+$/,"")}.svg`);
+      $("dxfButton").onclick=()=> downloadFile(payload.files.dxf, `${entry.name.replace(/\.[^/.]+$/,"")}.dxf`);
+    }
+    async function downloadFile(url, filename){
+      try{
+        const r=await fetch(url);
+        if(!r.ok){
+          let detail="Download failed";
+          try{ const j=await r.json(); detail=j.detail||detail; }catch{ detail = await r.text().catch(()=>detail); }
+          throw new Error(detail);
+        }
+        const blob=await r.blob();
+        const a=document.createElement("a"); const href=URL.createObjectURL(blob);
+        a.href=href; a.download=filename; a.click(); setTimeout(()=>URL.revokeObjectURL(href), 4000);
+      }catch(e){ toast(e.message||"Download failed", true); }
+    }
+
+    // actions
+    $("vectorizeButton").addEventListener("click", async ()=>{
+      const entry=Store.getActive();
+      if(!entry) return toast("Add an image before vectorizing.", true);
+      await Queue.vectorizeOne(entry);
     });
-    function bindResultDownloads(payload, file) { $('svgButton').disabled = false; $('dxfButton').disabled = false; $('svgButton').onclick = () => downloadFile(payload.files.svg, `${file.name.replace(/\.[^/.]+$/, '')}.svg`); $('dxfButton').onclick = () => downloadFile(payload.files.dxf, `${file.name.replace(/\.[^/.]+$/, '')}.dxf`); }
-    async function downloadFile(url, filename) { try {
- const response = await fetch(url); if (!response.ok) throw new Error('Download failed'); const blob = await response.blob(); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = filename; link.click(); URL.revokeObjectURL(link.href); } catch (error) { toast(error.message, true); } }
-    $('resetButton').addEventListener('click', reset);
-    function reset() { state.objectUrls.forEach((url) => URL.revokeObjectURL(url)); state.objectUrls.clear(); state.results.forEach((result) => URL.revokeObjectURL(result.svgUrl)); state.results.clear(); state.files = []; state.result = null; state.activeIndex = 0; state.objectUrl = null; fileInput.value = ''; dropzone.classList.remove('hidden'); previewWrap.classList.remove('visible'); emptyState.style.display = 'flex'; renderQueue(); }
-    $('splitView').addEventListener('click', () => { $('splitView').classList.add('active'); $('compareView').classList.remove('active'); $('previewGrid').style.display = 'grid'; $('compare').style.display = 'none'; });
-    $('compareView').addEventListener('click', () => { if (!state.result) return toast('Vectorize an image to compare both versions.', true); $('compareView').classList.add('active'); $('splitView').classList.remove('active'); $('previewGrid').style.display = 'none'; $('compare').style.display = 'block'; });
-    $('compareRange').addEventListener('input', (event) => { const value = event.target.value; $('compareLine').style.left = `${value}%`; document.querySelector('.compare-handle').style.left = `${value}%`; $('compareVector').style.clipPath = `inset(0 ${100 - value}% 0 0)`; });
-    $('zoomIn').addEventListener('click', () => { state.zoom = Math.min(2, state.zoom + .1); applyZoom(); }); $('zoomOut').addEventListener('click', () => { state.zoom = Math.max(.5, state.zoom - .1); applyZoom(); });
-    function applyZoom() { $('zoomValue').textContent = `${Math.round(state.zoom * 100)}%`; document.querySelectorAll('.canvas img').forEach((img) => img.style.transform = `scale(${state.zoom})`); }
-    renderQueue();
+    $("vectorizeAllButton").addEventListener("click", ()=> Queue.vectorizeAll());
+    $("resetButton").addEventListener("click", ()=>{
+      Store.clearHistory();
+      // clear queue entries already handled in clearHistory
+      dropzone.classList.remove("hidden"); previewWrap.classList.remove("visible"); emptyState.style.display="flex";
+      Queue.render(); Queue.renderHistory(); Preview.renderSource();
+    });
+    $("clearHistoryBtn").addEventListener("click", ()=>{ Store.saveHistory([]); Queue.renderHistory(); toast("History cleared."); });
+    $("splitView").addEventListener("click", ()=>{ $("splitView").classList.add("active"); $("compareView").classList.remove("active"); $("previewGrid").style.display="grid"; $("compare").style.display="none"; });
+    $("compareView").addEventListener("click", ()=>{
+      const e=Store.getActive();
+      if(!e?.svgUrl) return toast("Vectorize an image to compare both versions.", true);
+      $("compareView").classList.add("active"); $("splitView").classList.remove("active"); $("previewGrid").style.display="none"; $("compare").style.display="block";
+    });
+    $("compareRange").addEventListener("input", e=>{
+      const v=e.target.value;
+      $("compareLine").style.left=`${v}%`;
+      const h=document.querySelector(".compare-handle"); if(h) h.style.left=`${v}%`;
+      $("compareVector").style.clipPath=`inset(0 ${100-v}% 0 0)`;
+    });
+    $("zoomIn").addEventListener("click", ()=>{ Store.zoom=Math.min(2, Store.zoom+.1); applyZoom(); });
+    $("zoomOut").addEventListener("click", ()=>{ Store.zoom=Math.max(.5, Store.zoom-.1); applyZoom(); });
+    function applyZoom(){
+      $("zoomValue").textContent=`${Math.round(Store.zoom*100)}%`;
+      document.querySelectorAll(".canvas img").forEach(img=> img.style.transform=`scale(${Store.zoom})`);
+      const cv=$("compareVector");
+      if(cv) cv.style.transform=`scale(${Store.zoom})`;
+      const cr=$("compareRaster");
+      if(cr) cr.style.transform=`scale(${Store.zoom})`;
+    }
+
+    // init: restore persisted queue hint + hydrate history from server
+    Store.loadPersisted();
+    Queue.render(); Queue.renderHistory(); Preview.renderSource();
+    Api.fetchJobs().then(jobs=>{
+      if(jobs.length){
+        const hist=Store.loadHistory();
+        let added=0;
+        for(const j of jobs){
+          if(!hist.some(h=>h.payload.id===j.id)){
+            hist.push({name: j.id, payload:j});
+            added++;
+          }
+        }
+        if(added){ Store.saveHistory(hist); Queue.renderHistory(); }
+      }
+    });
+
+    // expose for tests (stable)
+    window.__vectorlab = { Store, Api, Queue, Preview };
   </script>
 </body>
 </html>
