@@ -4,6 +4,18 @@ from pathlib import Path
 
 
 UI = Path(__file__).parents[1] / "app" / "static" / "index.html"
+STATIC_DIR = Path(__file__).parents[1] / "app" / "static"
+
+
+def _all_static_text() -> str:
+    # Collect index.html + all static modules (behavior lives across split files)
+    parts: list[str] = []
+    for p in [UI, *STATIC_DIR.glob("*.js"), *STATIC_DIR.glob("*.css")]:
+        try:
+            parts.append(p.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return "\n".join(parts)
 
 
 def test_static_ui_has_required_workspace_controls():
@@ -14,40 +26,68 @@ def test_static_ui_has_required_workspace_controls():
         "vectorizeButton", "svgButton", "dxfButton", "queueList",
     ]:
         assert f'id="{element_id}"' in html
+    all_text = _all_static_text()
     assert 'accept="image/png,image/jpeg,image/webp' in html
     assert "image/svg+xml" in html
     assert "application/pdf" in html
     assert "multiple" in html
-    assert "FormData" in html
-    assert "URL.createObjectURL" in html
+    assert "FormData" in all_text
+    assert "URL.createObjectURL" in all_text
 
 
 def test_static_ui_never_contains_the_supplied_api_secret():
-    html = UI.read_text(encoding="utf-8")
-    assert "B2PbdY5zS44vj" not in html
-    assert "S44vjIfWaWEJzmoAEBILU0WdiVMmd41" not in html
+    all_text = _all_static_text()
+    assert "B2PbdY5zS44vj" not in all_text
+    assert "S44vjIfWaWEJzmoAEBILU0WdiVMmd41" not in all_text
 
 
 def test_static_ui_is_free_no_token_required():
-    html = UI.read_text(encoding="utf-8")
-    assert 'id="apiToken"' not in html
-    assert "Local API token" not in html
-    assert "Authorization:" not in html
-    assert "Bearer " not in html
+    all_text = _all_static_text()
+    assert 'id="apiToken"' not in all_text
+    assert "Local API token" not in all_text
+    assert "Authorization:" not in all_text
+    assert "Bearer " not in all_text
 
 
 def test_static_ui_supports_free_presigned_downloads():
-    html = UI.read_text(encoding="utf-8")
-    assert "payload.files.svg" in html
-    assert "payload.files.dxf" in html
-    assert "compareVector" in html
-    assert "zoomIn" in html and "zoomOut" in html
+    all_text = _all_static_text()
+    assert "payload.files.svg" in all_text
+    assert "payload.files.dxf" in all_text
+    assert "compareVector" in all_text
+    assert "zoomIn" in all_text and "zoomOut" in all_text
 
 
 def test_static_ui_has_batch_queue_and_professional_controls():
     html = UI.read_text(encoding="utf-8")
     for element_id in ["vectorizeAllButton", "palettePreview", "colorPrecision", "layerDifference", "historyList"]:
         assert f'id="{element_id}"' in html
+    all_text = _all_static_text()
     for token in ["Store", "Queue", "Preview", "Api", "localStorage", "AbortController"]:
-        assert token in html
-    assert "__vectorlab" in html
+        assert token in all_text
+    assert "__vectorlab" in all_text
+
+
+def test_static_ui_is_split_into_single_owner_modules():
+    html = UI.read_text(encoding="utf-8")
+    # Thin shell: link + import, not inline god file
+    assert 'href="/static/style.css"' in html
+    assert 'src="/static/app.js"' in html
+    assert html.count("<style") == 0, "CSS should be in style.css, not inline"
+    # No inline Store/Queue definitions — they live in modules
+    assert html.count("const Store") == 0
+    assert html.count("const Queue") == 0
+    # Modules exist and own single concerns
+    assert (STATIC_DIR / "style.css").exists()
+    assert (STATIC_DIR / "store.js").exists()
+    assert (STATIC_DIR / "api.js").exists()
+    assert (STATIC_DIR / "preview.js").exists()
+    assert (STATIC_DIR / "queue.js").exists()
+    assert (STATIC_DIR / "utils.js").exists()
+    assert (STATIC_DIR / "app.js").exists()
+    # Each module owns one concern
+    assert "localStorage" in (STATIC_DIR / "store.js").read_text(encoding="utf-8")
+    assert "fetch" in (STATIC_DIR / "api.js").read_text(encoding="utf-8")
+    assert "AbortController" in (STATIC_DIR / "queue.js").read_text(encoding="utf-8") or "AbortController" in (STATIC_DIR / "api.js").read_text(encoding="utf-8")
+    assert "renderSource" in (STATIC_DIR / "preview.js").read_text(encoding="utf-8")
+    assert "palette" in (STATIC_DIR / "preview.js").read_text(encoding="utf-8")
+    assert "vectorizeAll" in (STATIC_DIR / "queue.js").read_text(encoding="utf-8")
