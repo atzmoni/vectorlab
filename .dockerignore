@@ -18,6 +18,7 @@ myTEST
 !.env.example
 .vercel
 vercel.json
+railway.json
 api
 README.md
 Dockerfile

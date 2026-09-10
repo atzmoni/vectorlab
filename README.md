@@ -107,6 +107,23 @@ Set these before exposing the service:
 and the download request reads it back, so the two have to see the same
 filesystem.
 
+### Railway
+
+`railway.json` pins the Dockerfile builder and points the healthcheck at
+`/health`; Railway injects `PORT`, which the image already honours.
+
+1. **New Project → Deploy from GitHub repo**, and pick this repository.
+2. **Variables** → set `DOWNLOAD_SIGNING_SECRET` (`openssl rand -hex 32`) and
+   `CORS_ORIGINS` to the domain Railway assigns.
+3. **Volumes** → attach one mounted at `/data`. Without it, outputs live in the
+   container's writable layer and every redeploy invalidates outstanding
+   download links.
+4. Deploys follow pushes to the connected branch.
+
+Keep the service at one replica unless `OUTPUT_DIR` is moved to shared storage
+first — see the note above on why vectorize and download must share a
+filesystem.
+
 ### Why not serverless
 
 `vercel.json` and `api/index.py` are kept for reference, but the app does not
