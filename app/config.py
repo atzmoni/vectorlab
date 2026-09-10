@@ -14,7 +14,23 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 
-OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", str(BASE_DIR.parent / "output"))).resolve()
+# Vercel serverless has read-only filesystem except /tmp
+_is_vercel = bool(os.getenv("VERCEL"))
+_env_output = os.getenv("OUTPUT_DIR", "").strip()
+if _env_output:
+    OUTPUT_DIR = Path(_env_output).resolve()
+    # On Vercel, remap any non-/tmp path to /tmp to avoid read-only errors
+    if _is_vercel and not str(OUTPUT_DIR).startswith("/tmp"):
+        # Preserve only the last path component under /tmp/output
+        OUTPUT_DIR = Path("/tmp/output")
+elif _is_vercel:
+    OUTPUT_DIR = Path("/tmp/output")
+else:
+    OUTPUT_DIR = (BASE_DIR.parent / "output").resolve()
+try:
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+except OSError:
+    pass  # lambda cold start / read-only fallback; will retry on write
 MAX_UPLOAD_MB = max(1, int(os.getenv("MAX_UPLOAD_MB", "20")))
 DOWNLOAD_TTL_SECONDS = max(60, int(os.getenv("DOWNLOAD_TTL_SECONDS", "3600")))
 SWEEP_INTERVAL_SECONDS = max(30, int(os.getenv("SWEEP_INTERVAL_SECONDS", "300")))
