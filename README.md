@@ -124,24 +124,23 @@ Keep the service at one replica unless `OUTPUT_DIR` is moved to shared storage
 first — see the note above on why vectorize and download must share a
 filesystem.
 
-### Why not serverless
+### Vercel
 
-`vercel.json` and `api/index.py` are kept for reference, but the app does not
-fit Vercel's Python runtime:
+`vercel.json` and `api/index.py` deploy the same FastAPI app as a serverless
+function, and that path is live at https://dxf-vector.vercel.app. The build
+fits: the dependencies measure ~220 MB unzipped, under the 250 MB ceiling.
+Deploys follow pushes to `master`.
 
-- **Downloads break.** Vectorize and download are separate invocations that can
-  land on different instances, each with its own `/tmp`. The download 404s
-  whenever it misses. The in-memory job registry in `app/jobs.py` splits the
-  same way.
-- **The bundle is too large.** The dependencies measure 73 MB compressed and
-  220 MB unzipped, against the 50 MB `maxLambdaSize` in `vercel.json` and a
-  250 MB uncompressed ceiling — before application code. `cv2` alone is 74 MB,
-  `fitz` 49 MB, `numpy` 46 MB.
-- **Trimming does not rescue it.** Dropping PDF support saves 20 MB and still
-  misses the cap. Getting under it means dropping OpenCV, which sits on the
-  primary path (`pipeline.py` → `preprocessed_png`), not on the fallback — so
-  the cost is the preprocessing quality the engine is built around, and the
-  download problem would remain regardless.
+One caveat is worth knowing before relying on it for production traffic.
+Vectorize writes the SVG/DXF to `/tmp` and download reads it back, but the two
+are separate invocations that can land on different instances, each with its
+own `/tmp`; the in-memory job registry in `app/jobs.py` splits the same way. In
+practice a warm instance usually serves both, so downloads work — but a
+download that lands elsewhere 404s, and outputs never survive a redeploy.
+
+The container path above avoids that entirely by giving both requests the same
+volume, which is why it is the better fit for sustained use. Serverless remains
+the right choice for a low-traffic demo.
 
 ## Notes
 
