@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
 
-MAX_IMAGE_PIXELS = int(os.getenv("MAX_IMAGE_PIXELS", "50000000"))
-MAX_VECTOR_BYTES = int(os.getenv("MAX_VECTOR_BYTES", "8000000"))
+from .config import MAX_IMAGE_PIXELS, MAX_VECTOR_BYTES  # re-export for compat
+
+__all__ = ["VectorizeSettings", "normalize_settings", "MAX_IMAGE_PIXELS", "MAX_VECTOR_BYTES"]
 
 
 @dataclass
@@ -20,7 +20,6 @@ class VectorizeSettings:
     simplify: bool = True
     units: str = "mm"
     invert: bool = False
-    # professional color/precision extensions
     color_precision: int = 6
     layer_difference: int = 16
     corner_threshold: int = 60

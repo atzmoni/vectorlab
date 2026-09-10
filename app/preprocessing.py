@@ -6,7 +6,8 @@ import cv2
 import numpy as np
 from PIL import Image
 
-from .settings import MAX_IMAGE_PIXELS, VectorizeSettings
+from .config import MAX_IMAGE_PIXELS
+from .settings import VectorizeSettings
 
 
 def load_image(data: bytes) -> tuple[np.ndarray, int, int]:
