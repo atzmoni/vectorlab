@@ -50,14 +50,6 @@ def compose_matrix(outer: Matrix | None, inner: Matrix | None) -> Matrix | None:
     )
 
 
-def matrix_scale(mat: Matrix | None) -> float:
-    """Mean linear scale of a matrix — used to keep tolerances resolution-independent."""
-    if mat is None:
-        return 1.0
-    a, b, c, d, _, _ = mat
-    return math.sqrt(abs(a * d - b * c)) or 1.0
-
-
 def translation_matrix(tx: float, ty: float) -> Matrix:
     return (1.0, 0.0, 0.0, 1.0, tx, ty)
 

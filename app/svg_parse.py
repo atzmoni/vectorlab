@@ -194,50 +194,6 @@ def path_data_for(element: ET.Element) -> str:
     return shape_to_path_data(element)
 
 
-def collect_g_fills(svg: str) -> dict[ET.Element, str]:
-    """Inherited ``fill`` per element. Kept for callers that only need fills."""
-    try:
-        root = _root(svg)
-    except ValueError:
-        return {}
-    g_fill: dict[ET.Element, str] = {}
-
-    def walk(elem: ET.Element, inherited: str | None) -> None:
-        cur = inherited
-        if "fill" in elem.attrib:
-            cur = elem.attrib["fill"].strip()
-        declared = _declarations(elem.attrib.get("style", "")).get("fill")
-        if declared:
-            cur = declared
-        g_fill[elem] = cur if cur is not None else ""
-        for child in elem:
-            walk(child, cur)
-
-    walk(root, None)
-    return g_fill
-
-
-def effective_style(elem: ET.Element, style_classes: dict[str, dict[str, str]], g_fill: dict[ET.Element, str]) -> dict[str, str]:
-    """Resolved style for one element, in CSS cascade order.
-
-    Presentation attributes lose to class rules, which lose to the inline
-    ``style`` attribute — the order a browser uses.
-    """
-    style: dict[str, str] = {}
-    for key in _INHERITED_PROPS:
-        if key in elem.attrib:
-            style[key] = elem.attrib[key].strip()
-    for cls in elem.attrib.get("class", "").split():
-        if cls in style_classes:
-            style.update(style_classes[cls])
-    style.update(_declarations(elem.attrib.get("style", "")))
-    if "fill" not in style:
-        inherited = g_fill.get(elem, "")
-        if inherited:
-            style["fill"] = inherited
-    return style
-
-
 def extract_path_data(svg: str) -> list[str]:
     """Path data for every rendered geometry element, shapes included."""
     out: list[str] = []
