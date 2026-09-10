@@ -1,0 +1,25 @@
+# The build only needs requirements.txt, app/ and run.py — everything else is
+# either huge (.venv is ~700 MB) or irrelevant to the running service.
+.git
+.github
+.venv
+venv
+__pycache__
+**/__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+tests
+output
+myTEST
+.freebuff
+.env
+.env.*
+!.env.example
+.vercel
+vercel.json
+api
+README.md
+Dockerfile
+.dockerignore
+docker-compose.yml

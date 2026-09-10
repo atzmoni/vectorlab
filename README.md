@@ -81,6 +81,51 @@ The response includes signed `files.svg` and `files.dxf` URLs, processing metada
 
 `dxf_polylines` remains as an alias for `dxf_entities` for existing clients.
 
+## Deployment
+
+The service is packaged as a container. Any host that runs one — Railway,
+Render, Fly.io, a VPS — works without changes:
+
+```bash
+docker compose up --build          # local, http://127.0.0.1:8000
+# or
+docker build -t vectorlab . && docker run -p 8000:8000 \
+  -e DOWNLOAD_SIGNING_SECRET="$(openssl rand -hex 32)" \
+  -v vectorlab-output:/data vectorlab
+```
+
+Set these before exposing the service:
+
+| Variable | Why |
+| --- | --- |
+| `DOWNLOAD_SIGNING_SECRET` | Download URLs are HMAC-signed with it. Unset, it falls back to the placeholder in `app/config.py`, which is public — anyone could forge links. |
+| `CORS_ORIGINS` | Defaults to localhost; set it to your real origin. |
+| `OUTPUT_DIR` | Defaults to `/data/output` in the image, backed by a volume. |
+
+`/data` must be a real volume, and a second replica needs shared storage behind
+`OUTPUT_DIR` rather than its own disk. A vectorize request writes the SVG/DXF
+and the download request reads it back, so the two have to see the same
+filesystem.
+
+### Why not serverless
+
+`vercel.json` and `api/index.py` are kept for reference, but the app does not
+fit Vercel's Python runtime:
+
+- **Downloads break.** Vectorize and download are separate invocations that can
+  land on different instances, each with its own `/tmp`. The download 404s
+  whenever it misses. The in-memory job registry in `app/jobs.py` splits the
+  same way.
+- **The bundle is too large.** The dependencies measure 73 MB compressed and
+  220 MB unzipped, against the 50 MB `maxLambdaSize` in `vercel.json` and a
+  250 MB uncompressed ceiling — before application code. `cv2` alone is 74 MB,
+  `fitz` 49 MB, `numpy` 46 MB.
+- **Trimming does not rescue it.** Dropping PDF support saves 20 MB and still
+  misses the cap. Getting under it means dropping OpenCV, which sits on the
+  primary path (`pipeline.py` → `preprocessed_png`), not on the fallback — so
+  the cost is the preprocessing quality the engine is built around, and the
+  download problem would remain regardless.
+
 ## Notes
 
 - VTracer `1.0.0-alpha.4` is pinned because it exposes the current `Config(...).convert_bytes(...)` Python API.
