@@ -1,4 +1,4 @@
-# VectorLab
+# DXF.Vector
 
 A self-contained raster-to-vector workspace and FastAPI backend for PNG, JPG, and WEBP images. Free and open — no API key or registration required. The SVG path engine is VTracer-first, with local OpenCV preprocessing and an OpenCV contour fallback when the VTracer wheel is unavailable. DXF output is generated locally with `ezdxf` as closed R2000 POLYLINE entities for broad CNC/CAM compatibility.
 
