@@ -135,13 +135,21 @@ async def vectorize_endpoint(
         raise HTTPException(status_code=422, detail="Vectorization failed for this file") from exc
     elapsed_ms = round((time.perf_counter() - started) * 1000)
     expires = int(time.time()) + DOWNLOAD_TTL_SECONDS
+    # "contours" counts geometry; "dxf_entities" counts what the DXF holds. They
+    # differ because a filled contour emits both a HATCH and an outline SPLINE.
+    dxf_stats = result.get("dxf_stats") or {}
     statistics = {
         "width": result["width"],
         "height": result["height"],
         "nodes": result["node_count"],
         "contours": result["contour_count"],
         "closed_paths": result["closed_paths"],
+        "open_paths": result.get("open_paths", 0),
+        "dxf_entities": result["dxf_polylines"],
         "dxf_polylines": result["dxf_polylines"],
+        "splines": dxf_stats.get("splines", 0),
+        "hatches": dxf_stats.get("hatches", 0),
+        "layers": dxf_stats.get("layers", []),
     }
     processing = {**result["processing"], "duration_ms": elapsed_ms}
     try:

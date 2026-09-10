@@ -40,12 +40,15 @@ def test_real_vtracer_monochrome_svg_and_cut_ready_dxf():
     assert result["processing"]["engine"] == "vtracer-spline"
     assert result["contour_count"] >= 1
     assert result["closed_paths"] == result["contour_count"]
-    assert result["dxf_polylines"] == result["closed_paths"]
+    # Each filled contour emits a HATCH plus an outline SPLINE, so the DXF holds
+    # more entities than there is geometry. The two counts are not interchangeable.
+    assert result["dxf_polylines"] >= result["closed_paths"]
     assert result["svg"].startswith(b"<?xml")
     assert 'width="42.333mm"' in result["svg"].decode()
     document = parse_dxf(result["dxf"])
     entities = list(document.modelspace())
     assert len(entities) == result["dxf_polylines"]
+    assert result["dxf_stats"]["splines"] + result["dxf_stats"]["hatches"] == len(entities)
     # Professional engine emits native cubic SPLINE entities (preserving every Bezier), plus HATCH for filled contours.
     assert any(entity.dxftype() == "SPLINE" for entity in entities)
     assert document.header["$INSUNITS"] == 4
@@ -71,9 +74,9 @@ def test_opencv_fallback_is_local_and_produces_closed_dxf(monkeypatch):
     result = vectorizer.vectorize(raster_bytes(), {"mode": "monochrome", "units": "mm"}, "png")
     assert result["processing"]["engine"] == "opencv-contour-bezier-fallback"
     assert result["contour_count"] >= 1
-    assert result["dxf_polylines"] == result["closed_paths"]
+    assert result["dxf_polylines"] >= result["closed_paths"]
     document = parse_dxf(result["dxf"])
-    assert len(list(document.modelspace())) >= 1
+    assert len(list(document.modelspace())) == result["dxf_polylines"]
 
 
 def test_pixel_to_path_cleanup_removes_small_components():

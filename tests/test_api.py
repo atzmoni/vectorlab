@@ -132,3 +132,32 @@ async def test_upload_limit_reads_only_one_byte_over_limit(client, monkeypatch):
     oversized = b"0" * (1024 * 1024 + 1)
     response = await client.post("/api/v1/vectorize", files={"image": ("x.png", oversized, "image/png")})
     assert response.status_code == 413
+
+
+@pytest.mark.anyio
+async def test_statistics_report_geometry_and_dxf_entities_separately(client):
+    """Contours count geometry; entities count what the DXF holds. They differ."""
+    response = await client.post(
+        "/api/v1/vectorize",
+        files={"image": ("shape.svg", svg_bytes(), "image/svg+xml")},
+        data={"settings": '{"units":"mm"}'},
+    )
+    assert response.status_code == 200, response.text
+    stats = response.json()["statistics"]
+    for key in ("contours", "closed_paths", "open_paths", "dxf_entities", "splines", "hatches", "layers"):
+        assert key in stats, f"missing statistic {key}"
+    assert stats["contours"] == stats["closed_paths"] + stats["open_paths"]
+    assert stats["dxf_entities"] == stats["splines"] + stats["hatches"]
+    # A filled contour emits a HATCH and an outline SPLINE, so entities exceed contours.
+    assert stats["dxf_entities"] > stats["contours"]
+    assert stats["dxf_polylines"] == stats["dxf_entities"]  # legacy alias
+
+
+@pytest.mark.anyio
+async def test_statistics_name_the_dxf_layers(client):
+    response = await client.post(
+        "/api/v1/vectorize",
+        files={"image": ("shape.svg", svg_bytes(), "image/svg+xml")},
+    )
+    layers = response.json()["statistics"]["layers"]
+    assert layers and all(isinstance(name, str) for name in layers)
