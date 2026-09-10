@@ -3,17 +3,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
-
-try:
-    from dotenv import load_dotenv
-except ImportError:  # pragma: no cover
-    def load_dotenv() -> None:
-        return None
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
@@ -22,44 +15,33 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import jobs
+from .config import CORS_ORIGINS, DOWNLOAD_TTL_SECONDS, MAX_UPLOAD_MB, OUTPUT_DIR, STATIC_DIR, SWEEP_INTERVAL_SECONDS
 from .pipeline import save_outputs, vectorize
 from .signing import safe_output_path, sign_download, verify_download
 
-load_dotenv()
 logger = logging.getLogger("vectorlab.api")
-BASE_DIR = Path(__file__).resolve().parent
-STATIC_DIR = BASE_DIR / "static"
-OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", str(BASE_DIR.parent / "output"))).resolve()
-MAX_UPLOAD_MB = max(1, int(os.getenv("MAX_UPLOAD_MB", "20")))
-DOWNLOAD_TTL_SECONDS = max(60, int(os.getenv("DOWNLOAD_TTL_SECONDS", "3600")))
-SWEEP_INTERVAL_SECONDS = max(30, int(os.getenv("SWEEP_INTERVAL_SECONDS", "300")))
-CORS_ORIGINS = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "http://127.0.0.1:8000,http://localhost:8000").split(",") if origin.strip()]
 
 # Re-export for tests that patch main.OUTPUT_DIR / main._sign_download etc.
 _sign_download = sign_download  # type: ignore[assignment]
 _verify_download = verify_download  # type: ignore[assignment]
 _safe_output_path = safe_output_path  # type: ignore[assignment]
-DOWNLOAD_SIGNING_SECRET = os.getenv("DOWNLOAD_SIGNING_SECRET", "vectorlab-local-secret")
+DOWNLOAD_SIGNING_SECRET = __import__("os").getenv("DOWNLOAD_SIGNING_SECRET", "vectorlab-local-secret")
 
-# Back-compat: tests import ``from app import vectorizer`` and patch ``main.vectorize`` for timing tests
-vectorize_fn = vectorize
+vectorize_fn = vectorize  # allow tests to monkeypatch main.vectorize
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Background periodic sweep — ensures TTL cleanup even when idle (no requests).
     stop = asyncio.Event()
 
     async def sweeper() -> None:
         while not stop.is_set():
             try:
-                # wait interval, but wake early on shutdown
                 try:
                     await asyncio.wait_for(stop.wait(), timeout=SWEEP_INTERVAL_SECONDS)
                     break
                 except asyncio.TimeoutError:
                     pass
-                # Sweep with current OUTPUT_DIR (may have been monkeypatched in tests — read global)
                 try:
                     await run_in_threadpool(jobs.sweep_expired, None, OUTPUT_DIR)
                 except Exception:
@@ -139,10 +121,8 @@ async def vectorize_endpoint(
             extension = "svg"
         if image.content_type == "application/pdf" and not extension:
             extension = "pdf"
-        # Purge stale outputs so DOWNLOAD_TTL is actually enforced (ephemeral lifecycle)
         await run_in_threadpool(jobs.sweep_expired, None, OUTPUT_DIR)
-        fn = vectorize_fn  # allow tests to monkeypatch ``main.vectorize``
-        # Some tests patch ``main.vectorize`` with a stub that does not accept ``extension``
+        fn = vectorize_fn
         try:
             result = await run_in_threadpool(fn, content, parsed_settings, extension)
         except TypeError:
@@ -164,7 +144,6 @@ async def vectorize_endpoint(
         "dxf_polylines": result["dxf_polylines"],
     }
     processing = {**result["processing"], "duration_ms": elapsed_ms}
-    # Register for history + TTL cleanup
     try:
         jobs.register_job(
             jobs.JobRecord(
@@ -207,5 +186,4 @@ async def download(
     return FileResponse(output_path, media_type=media_type, filename=output_path.name)
 
 
-# Back-compat re-export so tests patching ``main.vectorize`` still work
 vectorize = vectorize_fn  # type: ignore[no-redef]

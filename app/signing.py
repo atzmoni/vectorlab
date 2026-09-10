@@ -3,18 +3,19 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
-import os
-import time
 import secrets
+import time
 from pathlib import Path
 
 from fastapi import HTTPException
 
-DOWNLOAD_SECRET = os.getenv("DOWNLOAD_SIGNING_SECRET", "vectorlab-local-secret")
+from .config import DOWNLOAD_SIGNING_SECRET
+
+DOWNLOAD_SECRET = DOWNLOAD_SIGNING_SECRET  # compat alias
 
 
 def sign_download(job_id: str, format_name: str, expires: int, secret: str | None = None) -> str:
-    sec = secret or DOWNLOAD_SECRET
+    sec = secret or DOWNLOAD_SIGNING_SECRET
     payload = f"{job_id}:{format_name}:{expires}"
     digest = hmac.new(sec.encode(), payload.encode(), hashlib.sha256).digest()
     signature = base64.urlsafe_b64encode(digest).decode().rstrip("=")

@@ -4,6 +4,7 @@ import re
 from typing import Any
 
 from .settings import VectorizeSettings
+from .svg_utils import normalize_svg_root
 
 try:
     import vtracer
@@ -12,18 +13,16 @@ except ImportError:  # pragma: no cover
 
 
 def vtracer_svg(data: bytes, source_format: str, settings: VectorizeSettings) -> str:
-    # Honor test patch on the facade (app.vectorizer.vtracer) without circular import at import time.
     try:
-        import app.vectorizer as _vf  # lazy
+        import app.vectorizer as _vf  # lazy — honors test patch
 
-        if getattr(_vf, "vtracer", vtracer) is None:  # patched off in tests
+        if getattr(_vf, "vtracer", vtracer) is None:
             raise RuntimeError("VTracer is not installed")
     except ImportError:
         pass
     if vtracer is None:  # type: ignore[truthy-bool]
         raise RuntimeError("VTracer is not installed")
 
-    # Preferred current API (1.0.0a4)
     if hasattr(vtracer, "Config") and hasattr(vtracer.Config, "convert_bytes"):  # type: ignore[attr-defined]
         kwargs: dict[str, Any] = {
             "clustering": "bw" if settings.mode == "monochrome" else "color-cluster",
@@ -43,11 +42,9 @@ def vtracer_svg(data: bytes, source_format: str, settings: VectorizeSettings) ->
             kwargs["binary_threshold"] = settings.threshold
         if settings.simplify:
             kwargs["simplify"] = settings.tolerance
-        # Filter to accepted keys for the installed wheel
         try:
             return vtracer.Config(**kwargs).convert_bytes(data, format=source_format)  # type: ignore[union-attr]
         except TypeError:
-            # Some wheels reject newer keys — retry with known-good subset
             keep = {"clustering", "hierarchical", "mode", "filter_speckle", "path_precision", "optimize", "binary_threshold", "simplify"}
             return vtracer.Config(**{k: v for k, v in kwargs.items() if k in keep}).convert_bytes(data, format=source_format)  # type: ignore[union-attr]
 
@@ -79,14 +76,12 @@ def vtracer_svg(data: bytes, source_format: str, settings: VectorizeSettings) ->
 
 
 def normalize_vtracer_svg(svg: str, width: int, height: int, settings: VectorizeSettings) -> str:
-    physical_scale = 25.4 / 96 if settings.units == "mm" else 1 / 96
-    physical_width, physical_height = width * physical_scale, height * physical_scale
-    root_match = re.search(r"<svg\b[^>]*>", svg, flags=re.IGNORECASE)
-    if not root_match:
+    """Patch VTracer output width/height to physical units; viewBox is injected if missing."""
+    if not re.search(r"<svg\b[^>]*>", svg, flags=re.IGNORECASE):
         raise ValueError("VTracer returned invalid SVG")
-    root = root_match.group(0)
-    if not re.search(r"\bviewBox\s*=", root, flags=re.IGNORECASE):
-        root = root[:-1] + f' viewBox="0 0 {width} {height}">'
-    root = re.sub(r"\s+(?:width|height)\s*=\s*(['\"]).*?\1", "", root, flags=re.IGNORECASE)
-    root = root[:-1] + f' width="{physical_width:.3f}{settings.units}" height="{physical_height:.3f}{settings.units}">'
-    return svg[: root_match.start()] + root + svg[root_match.end() :]
+    # Delegate viewBox fallback + physical sizing to shared helper.
+    # Ensure viewBox exists with raster dims so normalize_svg_root can size correctly.
+    if not re.search(r"\bviewBox\s*=", svg, flags=re.IGNORECASE):
+        svg = re.sub(r"<svg\b([^>]*)>", rf'<svg\1 viewBox="0 0 {width} {height}">', svg, count=1, flags=re.IGNORECASE)
+    patched, _, _ = normalize_svg_root(svg, settings.units)
+    return patched
