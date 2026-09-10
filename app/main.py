@@ -61,7 +61,7 @@ async def lifespan(app: FastAPI):
             pass
 
 
-app = FastAPI(title="VectorLab Local Vectorization API", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="DXF.Vector Local Vectorization API", version="1.0.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
