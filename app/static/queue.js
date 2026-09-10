@@ -41,7 +41,7 @@ export const Queue = {
     if (!hist.length) { box.innerHTML = '<div class="queue-empty">Past vectors persist here after reload.</div>'; return; }
     box.innerHTML = hist.slice(0, 12).map((h) => {
       const p = h.payload; const s = p.statistics || {};
-      return `<div class="queue-item"><div class="thumb"><span style="font-size:15px">♡</span></div><div class="queue-meta"><div class="queue-name">${escapeHtml(h.name || p.id)}</div><div class="queue-status"><i class="dot green"></i>${s.contours || "?"} contours · ${p.palette ? p.palette.length + " colors" : ""}</div></div><div class="queue-actions"><button class="qbtn" data-hist-svg="${p.files.svg}">SVG</button><button class="qbtn" data-hist-dxf="${p.files.dxf}">DXF</button></div></div>`;
+      return `<div class="queue-item"><div class="thumb"><span style="font-size:15px">♡</span></div><div class="queue-meta"><div class="queue-name">${escapeHtml(h.name || p.id)}</div><div class="queue-status"><i class="dot green"></i>${s.contours ?? "?"} contours · ${s.dxf_entities ?? s.dxf_polylines ?? "?"} entities${p.palette && p.palette.length ? ` · ${p.palette.length} colors` : ""}</div></div><div class="queue-actions"><button class="qbtn" data-hist-svg="${p.files.svg}">SVG</button><button class="qbtn" data-hist-dxf="${p.files.dxf}">DXF</button></div></div>`;
     }).join("");
     box.querySelectorAll("[data-hist-svg]").forEach((b) => b.addEventListener("click", () => downloadFile(b.dataset.histSvg, "vector.svg")));
     box.querySelectorAll("[data-hist-dxf]").forEach((b) => b.addEventListener("click", () => downloadFile(b.dataset.histDxf, "vector.dxf")));

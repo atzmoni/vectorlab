@@ -1,6 +1,6 @@
 // Preview — owner of active-entry DOM + zoom/compare/palette
 import { Store } from "./store.js";
-import { $, escapeHtml, formatBytes, downloadFile } from "./utils.js";
+import { $, escapeHtml, formatBytes, downloadFile, formatEngineLine, statChips } from "./utils.js";
 
 function bindResultDownloads(payload, entry) {
   $("svgButton").disabled = false;
@@ -36,7 +36,9 @@ export const Preview = {
       $("vectorStatus").textContent = "COMPLETE";
       $("svgButton").disabled = false; $("dxfButton").disabled = false;
       const s = entry.payload?.statistics;
-      $("statsText").textContent = s ? `${Number(s.nodes).toLocaleString()} nodes · ${s.contours} closed contours` : "Completed";
+      // The chip strip carries the counts; this line carries engine provenance.
+      $("statsText").textContent = formatEngineLine(entry.payload?.processing);
+      this.renderStats(s, entry.payload?.processing);
       bindResultDownloads(entry.payload, entry);
       this.renderPalette(entry.payload?.palette || []);
     } else if (entry.status === "vectorizing") {
@@ -44,6 +46,7 @@ export const Preview = {
       $("vectorStatus").textContent = "RUNNING";
       $("svgButton").disabled = true; $("dxfButton").disabled = true;
       $("statsText").textContent = "Vectorizing…";
+      this.renderStats(null);
       $("palettePreview").innerHTML = "";
       $("paletteHint").textContent = "after vectorize";
     } else if (entry.status === "error") {
@@ -51,11 +54,13 @@ export const Preview = {
       $("vectorStatus").textContent = "ERROR";
       $("svgButton").disabled = true; $("dxfButton").disabled = true;
       $("statsText").textContent = entry.error || "Error";
+      this.renderStats(null);
     } else {
       $("vectorCanvas").innerHTML = '<div class="empty-vector"><strong>Ready to vectorize</strong>Adjust settings, then run the local engine.</div>';
       $("vectorStatus").textContent = "READY";
       $("svgButton").disabled = true; $("dxfButton").disabled = true;
       $("statsText").textContent = `${formatBytes(entry.size)} · ${(entry.type.split("/")[1] || "file").toUpperCase()} source`;
+      this.renderStats(null);
       $("palettePreview").innerHTML = "";
       $("paletteHint").textContent = "after vectorize";
     }
@@ -66,6 +71,15 @@ export const Preview = {
       cmpV.style.backgroundImage = `url(${entry.svgUrl})`;
       cmpV.style.backgroundSize = "contain"; cmpV.style.backgroundPosition = "center"; cmpV.style.backgroundRepeat = "no-repeat";
     }
+  },
+  renderStats(stats, processing) {
+    const strip = $("statStrip");
+    if (!strip) return;
+    const chips = statChips(stats, processing);
+    strip.classList.toggle("visible", chips.length > 0);
+    strip.innerHTML = chips.map((c) =>
+      `<div class="stat-chip"><span class="stat-value">${escapeHtml(c.value)}</span><span class="stat-label">${escapeHtml(c.label)}</span><span class="stat-note">${escapeHtml(c.note)}</span></div>`
+    ).join("");
   },
   renderPalette(palette) {
     const box = $("palettePreview"), hint = $("paletteHint");

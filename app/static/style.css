@@ -187,3 +187,12 @@ input[type="file"] { display: none; }
 
 @media (max-width: 1100px) { .workspace { grid-template-columns: 260px minmax(400px, 1fr); gap: 14px; } .right-panel { grid-column: 1 / -1; border-left: .0625rem solid var(--black); min-height: 180px; } .queue-list { flex-direction: row; flex-wrap: wrap; } .queue-item { min-width: 240px; flex: 1; } }
 @media (max-width: 730px) { .topbar { height: auto; min-height: 56px; padding: 10px 14px; gap: 12px; flex-wrap: wrap; margin: 10px 12px 0; border-radius: 18px; } .brand { min-width: auto; } .nav { order: 3; height: 30px; width: 100%; gap: 18px; } .nav a.active::after { bottom: -3px; } .credits { display: none; } .workspace { display: block; padding: 14px 12px 18px; } .left-panel, .right-panel { border: .0625rem solid var(--black); margin-bottom: 14px; } .left-panel { padding: 18px 14px; } .stage { padding: 0; } .preview-grid { grid-template-columns: 1fr; height: auto; } .preview-card { height: 280px; } .stage-toolbar { margin-bottom: 12px; } .dropzone { min-height: 260px; } .right-panel { padding: 16px 14px; } }
+
+/* Vectorization readout — geometry and DXF entity counts are separate figures */
+.stat-strip { display: none; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.stat-strip.visible { display: flex; }
+.stat-chip { flex: 1 1 auto; min-width: 116px; padding: 8px 12px; border: .0625rem solid var(--line-soft); border-radius: var(--radius); background: var(--surface-2); }
+.stat-chip .stat-value { display: block; font-size: 16px; font-weight: 700; letter-spacing: -.01em; color: var(--text); }
+.stat-chip .stat-label { display: block; margin-top: 1px; font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.stat-chip .stat-note { display: block; margin-top: 3px; font-size: 10px; color: var(--faint); }
+@media (max-width: 640px) { .stat-chip { min-width: calc(50% - 4px); } }

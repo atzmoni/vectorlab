@@ -91,3 +91,36 @@ def test_static_ui_is_split_into_single_owner_modules():
     assert "renderSource" in (STATIC_DIR / "preview.js").read_text(encoding="utf-8")
     assert "palette" in (STATIC_DIR / "preview.js").read_text(encoding="utf-8")
     assert "vectorizeAll" in (STATIC_DIR / "queue.js").read_text(encoding="utf-8")
+
+
+def test_static_ui_has_the_vectorization_stat_readout():
+    html = UI.read_text(encoding="utf-8")
+    assert 'id="statStrip"' in html
+    css = (STATIC_DIR / "style.css").read_text(encoding="utf-8")
+    for selector in [".stat-strip", ".stat-chip", ".stat-value", ".stat-label", ".stat-note"]:
+        assert selector in css, f"missing style for {selector}"
+
+
+def test_stat_readout_separates_contours_from_dxf_entities():
+    """The two counts differ — a filled contour exports as a HATCH plus a SPLINE."""
+    utils = (STATIC_DIR / "utils.js").read_text(encoding="utf-8")
+    assert "statChips" in utils
+    assert "dxf_entities" in utils
+    assert "closed_paths" in utils and "open_paths" in utils
+    assert "splines" in utils and "hatches" in utils
+    preview = (STATIC_DIR / "preview.js").read_text(encoding="utf-8")
+    assert "renderStats" in preview
+    # The old readout labelled the entity total as closed contours.
+    assert "closed contours" not in preview
+
+
+def test_stat_readout_reports_physical_cut_size_and_engine():
+    utils = (STATIC_DIR / "utils.js").read_text(encoding="utf-8")
+    assert "formatSize" in utils and "cut size" in utils
+    assert "formatEngineLine" in utils and "duration_ms" in utils
+
+
+def test_history_reports_contours_and_entities_separately():
+    queue = (STATIC_DIR / "queue.js").read_text(encoding="utf-8")
+    assert "s.contours" in queue
+    assert "dxf_entities" in queue
